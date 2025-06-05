@@ -141,7 +141,12 @@ def _plot_segmentation(axs,
         axs[i].fill_between(np.arange(len(dye_segment)), 0, max_value_dye,
                             where=dye_segment.flatten() == 1, color=color,
                             alpha=alpha,
-                            transform=axs[i].get_xaxis_transform())
+# --- BEGIN MOD: Amar (2025-04-19) ---
+# Commented out this line since it was causing an error on my laptop,
+# GPT said this line is not needed
+                            # transform=axs[i].get_xaxis_transform()
+# --- END MOD: Amar (2025-04-19) ---
+                            )
 
 
 def _get_marker_bin(marker):

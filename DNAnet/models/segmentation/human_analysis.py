@@ -1,5 +1,6 @@
 import logging
 
+from DNAnet.allele_callers import NON_AUTOSOMAL_MARKERS
 from DNAnet.data.data_models.hid_image import HIDImage
 from DNAnet.models.base import Model
 from DNAnet.models.prediction import Prediction
@@ -7,8 +8,6 @@ from DNAnet.typing import PathLike
 
 
 LOGGER = logging.getLogger('dnanet')
-
-NON_AUTOSOMAL_MARKERS = ['AMEL', 'DYS391', 'DYS576', 'DYS570']
 
 class HumanAnalysis(Model):
     def __init__(self):

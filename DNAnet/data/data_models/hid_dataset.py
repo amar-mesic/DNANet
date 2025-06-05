@@ -14,6 +14,7 @@ from DNAnet.data.caching import _load_cached_hf_data, write_to_hf_cache
 from DNAnet.data.data_models import Panel
 from DNAnet.data.data_models.base import InMemoryDataset, SimpleDataset
 from DNAnet.data.data_models.hid_image import HIDImage, Ladder
+from DNAnet.data.kit_compatibility.lane_standards import InternalSizeStandard
 from DNAnet.data.split import split_data_in_k_folds
 from DNAnet.typing import PathLike
 from DNAnet.utils import (
@@ -59,7 +60,9 @@ class HIDDataset(InMemoryDataset):
                  annotations_path: Optional[PathLike] = None,
                  panel: Optional[PathLike] = None,
                  hid_to_annotations_path: Optional[PathLike] = None,
+                 reference_genotype_path: Optional[PathLike] = None,
                  limit: Optional[int] = None,
+                 size_standard: str = InternalSizeStandard.WEN_ILS.value,
                  use_cache: Optional[bool] = False,
                  cache_path: Optional[PathLike] = None,
                  adjustment_of_annotations: Optional[str] = None,
@@ -93,6 +96,7 @@ class HIDDataset(InMemoryDataset):
 
             self._panel = Panel(panel_path=panel)
             # Map the hid file names to the annotation
+            # This is where for proved it, we simply run a regex on the file name
             self.annotation_dict = self._create_annotation_mapping_rd(
                 analysis_threshold_type=analysis_threshold_type,
                 hid_to_annotations_path=hid_to_annotations_path,

@@ -11,6 +11,7 @@ from scipy.signal import find_peaks
 
 from DNAnet.data.data_models import Allele, Annotation, Marker, Panel
 from DNAnet.data.data_models.base import Image
+from DNAnet.data.kit_compatibility.lane_standards import InternalSizeStandard
 from DNAnet.data.parsing import get_peak_data, parse_called_alleles
 from DNAnet.data.utils import (
     assert_image_data_valid_format,
@@ -21,6 +22,7 @@ from DNAnet.data.utils import (
     rescale_dye,
 )
 from DNAnet.typing import PathLike
+from DNAnet.utils import load_donor_alleles_provedit, load_donor_alleles
 
 
 LOGGER = logging.getLogger("dnanet")
@@ -34,9 +36,12 @@ class HIDImage(Image):
     :param panel: the panel to be used
     :param annotations_file: the path of the csv/txt file that contains
         the annotations of the HID file.
-    :param include_size_standard: include size standard in data
-        if `true` all six dyes are included
-        if `false` only the first five dyes are included
+    :param size_standard: the size standard to be used for the HID file
+        (default: WEN_ILS)
+    :type size_standard: InternalSizeStandard
+    :param include_size_standard: include size standard in the data attribute.
+        if `true` all six dyes are included. For inspection of the HID file.
+        if `false` only the first five dyes are included. For training + testing models.
     :param annotation: any Annotation belonging to the image
     :param use_cache: whether retrieved peaks should be cached
     :param meta: meta information of the HID file.
@@ -47,12 +52,16 @@ class HIDImage(Image):
                  path: PathLike,
                  panel: Optional[Panel] = None,
                  annotations_file: PathLike = None,
+                 size_standard: str = InternalSizeStandard.WEN_ILS.value,
                  include_size_standard: bool = False,
                  annotation: Optional[Annotation] = None,
+                 ground_truth: Optional[Annotation] = None,
                  use_cache: bool = True,
                  meta: MutableMapping[str, Any] = None):
+        
         self.path = path if isinstance(path, Path) else Path(path)
         self.annotations_file = annotations_file
+        self.size_standard = size_standard
         self.include_size_standard = include_size_standard
         self.use_cache = use_cache
         self.root = self.path.parent
@@ -97,21 +106,25 @@ class HIDImage(Image):
         if (profile := get_peak_data(self.path)) is None:
             return None
         # Use the size standard to translate the location in the profile (array) to base pairs
-        interpolated_base_pairs = get_interpolated_basepairs(np.array(profile[-1]))
+        interpolated_base_pairs = get_interpolated_basepairs(np.array(profile[-1]), self.size_standard)
+        # using none checks is defnitely not the best way to validate the size standard,
         if interpolated_base_pairs is None:
             # If the size standard does not pass validation, interpolated_base_pairs
             # becomes None and the image will be skipped when creating a dataset
             return None
+        
         # Scale the profile using the size standard
         data = self._rescale_profile(profile,
                                      interpolated_base_pairs,
+                                     self.size_standard,
                                      self.include_size_standard)
+        
         # Create a scaler, which is used to map a pixel index in the profile to a base pair
         # location, i.e. the first pixel is in fact BASE_PAIR_START, the last pixel is BASE_PAIR_END
-        self._scaler = interpolated_base_pairs[rescale_dye(interpolated_base_pairs)]
+        self._scaler = interpolated_base_pairs[rescale_dye(interpolated_base_pairs, self.size_standard)]
 
         called_alleles = None
-        # Determine the called alleles from the annotations file
+        # Determine the called alleles from the annotations file 
         if self.annotations_file and self._panel and \
                 (annotations_name := self.meta.get('annotations_name')):
             called_alleles = parse_called_alleles(self.annotations_file,
@@ -121,8 +134,24 @@ class HIDImage(Image):
         if called_alleles and self.annotation is None:
             # Parse the called alleles into a segmentation
             segmentation = self._get_segmentation(called_alleles, data.shape)
-            self._annotation = Annotation(image=segmentation)
+            self._annotation = Annotation(image=segmentation) # where the annotation is ASSIGNED
             self._meta['called_alleles'] = called_alleles
+
+        # But what if there is no annotations file, only genotype info?
+        # This is ofc hardcoded for the ProvedIt dataset for now
+        if self.annotation is None and self._panel:
+            try:
+                if self.size_standard == InternalSizeStandard.WEN_ILS.value:
+                    true_alleles = load_donor_alleles(self.path.stem, self._panel)
+                else:
+                    true_alleles = load_donor_alleles_provedit(self.path.stem, self._panel)
+                segmentation = self._get_segmentation(true_alleles, data.shape)
+                self._annotation = Annotation(image=segmentation)
+                self._meta["called_alleles"] = true_alleles
+            except ValueError as e:
+                LOGGER.warning(f"Could not load true alleles for {self.path}: {e}")
+                # If we cannot load the true alleles, we do not set the annotation.
+
 
         if data is None:
             raise ValueError(f'Reading {self.path} resulted in None')
@@ -167,6 +196,7 @@ class HIDImage(Image):
     @staticmethod
     def _rescale_profile(profile: np.ndarray,
                          interpolated_base_pairs: np.ndarray,
+                         size_standard: str,
                          include_standard: bool) -> np.ndarray:
         """
         Rescale profile based on interpolated base pairs.
@@ -179,7 +209,7 @@ class HIDImage(Image):
         """
         # Select profile based on include_standard flag
         selected_profile = profile if include_standard else profile[:-1]
-        data = selected_profile[:, rescale_dye(interpolated_base_pairs)]
+        data = selected_profile[:, rescale_dye(interpolated_base_pairs, size_standard)]
         return data[..., np.newaxis]
 
     def _get_segmentation(self,

@@ -36,6 +36,12 @@ class Allele:
     def bin(self) -> np.ndarray:
         """
         Left and right bin of base pair position (size)
+        # code example:
+        >>> res = np.array([0.0, 1.])[:, np.newaxis]
+        >>> print(res)
+        ...
+        >>> array([[0.],
+        >>>        [1.]])
         """
         return np.array([self.left_bin, self.right_bin])[:, np.newaxis]
 

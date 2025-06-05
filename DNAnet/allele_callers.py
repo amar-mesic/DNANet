@@ -12,7 +12,8 @@ from DNAnet.models.prediction import Prediction
 
 LOGGER = logging.getLogger('dnanet')
 
-NON_AUTOSOMAL_MARKERS = ['AMEL', 'DYS391', 'DYS576', 'DYS570']
+# non-autosomal markers that are not present in the NFI dataset annotations
+NON_AUTOSOMAL_MARKERS = ['AMEL', 'DYS391', 'DYS576', 'DYS570', 'Yindel']
 
 
 class AlleleCaller(ABC):

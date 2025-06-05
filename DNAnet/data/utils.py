@@ -1,14 +1,23 @@
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
+import logging
+
+
+from sklearn import base
+from DNAnet.data.kit_compatibility.lane_standards import get_size_standard_bps, ALL_SIZE_STANDARDS
 
 import numpy as np
 import scipy
 
+LOGGER = logging.getLogger('dnanet')
 
-SIZE_STANDARD_BPS: np.ndarray = np.array([65, 80, 100, 120, 140, 160, 180,
-                                          200, 225, 250, 275, 300, 325,
-                                          350, 375, 400, 425, 450, 475])
-BASE_PAIR_START, BASE_PAIR_END = 65, 475
-RESCALE_SIZE = 4096
+
+# --- BEGIN MOD: Amar (2025-04-19) ---
+# This is the begin and end number of base pairs for the ILS.
+# Instead of hardcoding, we can use the values from lane_standard.py.
+
+# BASE_PAIR_START, BASE_PAIR_END = 65, 475
+# RESCALE_SIZE = 4096
+# --- END MOD: Amar (2025-04-19) ---
 
 
 def assert_image_data_valid_format(data: np.ndarray,
@@ -56,54 +65,98 @@ def process_image(
     return data
 
 
-def validate_ss_peaks(size_standard_peaks_idxs: np.ndarray) -> bool:
+def validate_ss_peaks(
+    peaks: np.ndarray,
+    expected_bps: np.ndarray,
+    min_pixels_per_bp: float = 7,
+    max_pixels_per_bp: float = 13
+) -> bool:
     """
     Validate whether the identified peaks in the size standard are likely to
-    correspond with the SIZE_STANDARD_BPS array, by checking whether 19 peaks
-    have been identified and the relative distances between base pairs is
-    between certain values. Returns True if all checks are passed, False otherwise.
+    correspond with at least one of the provided base pair arrays.
+    Since we look at distances between peaks, is that why peaks will need to be one element shorter than the base pair array?
+
+    In this method we conduct up to 3 checks:
+    1. Check if the relative distances between the peaks are within the expected range of base pairs.
+    2. If the first check fails, we check if the relative distances of the last 20 peaks are within the expected range.
+    3. If the first two checks fail, we check if the relative distances of the peaks after a certain threshold (e.g., 4000) are within the expected range.
+
+    :param size_standard_peaks_idxs: Indices of detected peaks in the size standard channel.
+    :param expected_bps: Array or list of arrays of expected base pair positions for dye standards.
+    :param min_pixels_per_bp: Minimum allowed pixels per base pair.
+    :param max_pixels_per_bp: Maximum allowed pixels per base pair.
+    :return: True if any check is passed, False otherwise.
     """
-    if len(size_standard_peaks_idxs) != 19:
-        # The number of selected peaks should be 19
-        return False
-    distances_between_peaks = np.absolute(
-        np.diff((size_standard_peaks_idxs,
-                 scipy.ndimage.shift(size_standard_peaks_idxs, shift=1, mode='nearest')
-                 ), axis=0))[0, 1:]
-    distance_basepairs = np.absolute(
-        np.diff((SIZE_STANDARD_BPS,
-                 scipy.ndimage.shift(SIZE_STANDARD_BPS, shift=1, mode='nearest')
-                 ), axis=0))[0, 1:]
+
+    distances_between_peaks = np.abs(
+        np.diff((peaks,
+                    scipy.ndimage.shift(peaks, shift=1, mode='nearest')
+                    ), axis=0))[0, 1:]
+    
+    distance_basepairs = np.abs(
+        np.diff((expected_bps,
+                    scipy.ndimage.shift(expected_bps, shift=1, mode='nearest')
+                    ), axis=0))[0, 1:]
+    
     relative_distances = distances_between_peaks / distance_basepairs
-    if not np.all((relative_distances <= 13) & (relative_distances >= 7)):
-        # The pixels per basepair are expected to be between 7 and 13
-        return False
-    return True
+
+    passes_validation = bool(np.all((relative_distances <= max_pixels_per_bp) & (relative_distances >= min_pixels_per_bp)))
+    if passes_validation:
+        return True
+    LOGGER.warning("Size standard peaks validation failed. Trying validation only scan points after 4000")
+    
+    # Temporary fix: only look at last 20 peaks
+    # since first few peaks are often not ILS peaks, but primer flares.
+    # TODO: Detect if peaks are primer flares and remove them. This would be in previous step.
+    passes_validation = passes_validation or bool(np.all((relative_distances[-20:] <= max_pixels_per_bp) & (relative_distances[-20:] >= min_pixels_per_bp)))
+    
+    # Adjustable, but we can expect in most EPGs that the first 4000 scan points do not contain any alleles.
+    threshold = 3700
+    peaks_filtered = peaks[peaks >= threshold]
+    distances_between_peaks_filtered = np.abs(
+        np.diff((peaks_filtered,
+                    scipy.ndimage.shift(peaks_filtered, shift=1, mode='nearest')
+                    ), axis=0))[0, 1:]
 
 
-def get_interpolated_basepairs(size_standard: np.ndarray) -> (
+    relative_distances_filtered = relative_distances[-distances_between_peaks_filtered.shape[0]:]
+
+    return passes_validation or bool(np.all((relative_distances_filtered <= max_pixels_per_bp) & (relative_distances_filtered >= min_pixels_per_bp)))
+
+
+
+def get_interpolated_basepairs(size_standard_dye_lane: np.ndarray, size_standard: str) -> (
         Optional)[np.ndarray]:
     """
     Takes the array of the size standard and detects the 19 peaks corresponding
     with the provided list of base pairs. Put these base pairs on their position
     in an array and interpolates all values in between.
 
-    :param size_standard: size standard array
+    :param size_standard_dye: the values of the intenral size standard dye for this image/EPG
     :return: interpolated base pairs
     """
     # find the peaks in the size standard array
-    size_standard_peaks_idxs = extract_ss_peaks(size_standard)
-    # only take the last 19 peaks excluding the final peak, validate by comparing their
+    # TODO: Detect if peaks are primer flares and remove them. This would be in previous step.
+    size_standard_peaks_idxs = extract_ss_peaks(size_standard_dye_lane)
+
+    bps = get_size_standard_bps(size_standard)
+    # only take the last n peaks excluding the final peak, validate by comparing their
     # relative distances to SIZE_STANDARD_BPS
-    size_standard_peaks_idxs = size_standard_peaks_idxs[-20:-1]
-    if not validate_ss_peaks(size_standard_peaks_idxs):
+    relevant_peak_indices_from_lane_standard = size_standard_peaks_idxs[-len(bps)-1:-1]
+
+    # TODO: do not return none, but flag image as invalid
+    if not validate_ss_peaks(relevant_peak_indices_from_lane_standard, expected_bps=bps):
         return None
-    # put the peak indices on the base pair values
-    interp = basepair_interpolator(indices=size_standard_peaks_idxs,
-                                   original_x_values=SIZE_STANDARD_BPS)
-    basepairs_interpolated = interp(np.arange(len(size_standard)))
+
+    # returns an interpolator function that maps the indices of the size standard peaks (i.e. scan points) to the base pairs
+    interpolator = basepair_interpolator(indices=relevant_peak_indices_from_lane_standard,
+                                   original_x_values=bps)
+    
     # interpolate these to the complete array (all values for indices outside
     # the size_standard_peaks_idxs range will be 0)
+    # apply the interpolator function
+    basepairs_interpolated = interpolator(np.arange(len(size_standard_dye_lane)))
+
     return basepairs_interpolated
 
 
@@ -207,19 +260,18 @@ def extract_ss_peaks(array: np.ndarray) -> np.ndarray:
     return np.delete(peak_idxs, close_idxs)
 
 
-def basepair_interpolator(indices: Union[np.ndarray, list[float]],
-                          original_x_values: Union[np.ndarray, list[float]],
+def basepair_interpolator(indices: np.ndarray,
+                          original_x_values: np.ndarray,
                           extrapolate: bool = False) \
         -> scipy.interpolate.interp1d:
     """
     Generates a function whose call method uses interpolation to find the
     value of new points.
 
-    :param indices: indices for which a value is present
-    :param original_x_values: known x_values between which to interpolate
+    :param indices: indices of the size standard peaks in the EPG
+    :param original_x_values: the base pair values of the chosen size standard
     :param extrapolate: whether to use extrapolation or not
     """
-    indices = np.asarray(indices)
     original_x_values = np.asarray(original_x_values)
     interp = scipy.interpolate.interp1d(indices,
                                         original_x_values,
@@ -229,7 +281,7 @@ def basepair_interpolator(indices: Union[np.ndarray, list[float]],
     return interp
 
 
-def rescale_dye(basepairs: np.ndarray) -> np.ndarray:
+def rescale_dye(basepairs: np.ndarray, size_standard: str, rescale_size: int = 4096) -> np.ndarray:
     """
     Rescale the interpolated base pairs of the size standard so that they fit between
     BASE_PAIR_START and BASE_PAIR_END, on exactly RESCALE_SIZE pixels. The output array
@@ -238,7 +290,9 @@ def rescale_dye(basepairs: np.ndarray) -> np.ndarray:
     E.g. if the output is np.array([3825, 3826, ..]), then a pixel on index 3825 should be
     scaled to the first pixel, and a pixel on index 3826 should be scaled to the second pixel.
     """
-    target_linspace = np.linspace(BASE_PAIR_START, BASE_PAIR_END, RESCALE_SIZE)
+    bps = get_size_standard_bps(size_standard)
+    bp_start, bp_end = bps[0], bps[-1]
+    target_linspace = np.linspace(bp_start, bp_end, rescale_size)
 
     # Presorting interpolated base pairs
     sort_indices = np.argsort(basepairs)

@@ -35,6 +35,8 @@ THRESHOLDS_PER_LOCUS = {
     'FGA': {'low': 40, 'high': 95},
     'DYS576': {'low': 40, 'high': 95},
     'DYS570': {'low': 40, 'high': 95},
+    # TODO: Yindel is not in the NFI dataset, but in ProvedIt, where did we get these values from?
+    'Yindel': {'low': 40, 'high': 95},
 }
 
 

@@ -15,8 +15,8 @@ dependencies = [
     "matplotlib>=3.10.1",
     "mlflow>=2.21.3",
     "tensorboard>=2.18.0"
-
 ]
+
 requires-python = ">=3.10,<=3.12"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -29,3 +29,6 @@ distribution = false
 testing = [
     "pytest>=8.3.5",
 ]
+
+[tool.setuptools.packages.find]
+include = ["DNAnet*", "config*", "resources*"]

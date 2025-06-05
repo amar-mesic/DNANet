@@ -8,6 +8,8 @@ from collections import defaultdict
 from itertools import islice
 from typing import Dict, Iterable, Iterator, List, Optional, Sequence, Union
 
+from argon2 import Type
+
 from DNAnet.data.data_models import Allele, Marker, Panel
 from DNAnet.typing import PathLike
 
@@ -45,6 +47,26 @@ def get_prefix_from_filename(file_name: PathLike) -> str:
         return file_name.split("_")[0]  # take '1A2'
     else:
         raise ValueError(f"Cannot take prefix from provided file name: {file_name}")
+    
+
+
+
+# PROVEDIT SPECIFIC
+# Currently only supports 2 contributors
+# TODO: allow for 2-5 contributors
+def get_contributors_from_filename(file_name: PathLike) -> list[str]:
+    match = re.search(r"RD14-0003-(\d+)_(\d+)-(\d+);(\d+)", str(file_name))
+
+    if match:
+        c1, c2 = match.group(1), match.group(2)
+        # r1, r2 = match.group(3), match.group(4)
+        return [c1, c2]
+    else:
+        raise ValueError(f"Cannot extract prefix from provided file name: {file_name}")
+    
+
+
+
 
 
 def is_non_case_sample_hid_file_name(file_name: str) -> bool:
@@ -96,6 +118,49 @@ def dict_to_marker_list(marker_dict: Union[List[Dict], str], as_json: bool = Fal
     return markers_list
 
 
+def load_donor_alleles_provedit(file_name: str, panel: Panel) -> list[Marker]:
+    """
+    For R&D files, we know the donors that contributed and the DNA profiles of the donors. For a
+    single .hid file, find the donors (from the file name) and return the list of Markers of those
+    donors combined.
+    :param file_name: .hid file to load actual donors for
+    :param rd_data_root: root folder of the RD data, containing a Referenties folder
+    :param panel: the panel to retrieve the dye row of the markers from
+    """
+    reference_path = "resources/data/ProvedIt/References"
+    
+    contributors = get_contributors_from_filename(file_name)
+
+    # find the set of all alleles of the donors per marker
+    marker_allele_strings = defaultdict(set)
+    for file_stem in contributors:
+        reference_profiles_path = os.path.join(reference_path, f'{file_stem}.csv')
+        with open(reference_profiles_path, "r") as f:
+            reader = csv.DictReader(f, delimiter=";")
+            for row in reader:
+                marker_allele_strings[row['Marker']].update([row['Allele1'], row['Allele2']])
+
+    # transform into Marker/Allele objects
+    # This method is lacking because previously full allele info was not being added
+    markers = []
+    for marker_name, alleles in marker_allele_strings.items():
+        dye_row = panel.get_dye_row(marker_name)
+        if dye_row is None:  # may be missing, e.g. Y-profile   
+            raise TypeError(
+            f"Marker {marker_name} not found in panel {panel}. "
+            "Please check the panel or the marker name."
+        )
+        new_alleles = [
+            Allele(allele_name, *panel.get_allele_info(marker_name, allele_name)) 
+            for allele_name in sorted(alleles)
+        ]
+        new_marker = Marker(dye_row, marker_name, new_alleles)
+
+        markers.append(new_marker)
+    return markers
+
+
+# TODO: replace built-in function with a strategy that implements this
 def load_donor_alleles(file_name: str, panel: Panel) -> List[Marker]:
     """
     For R&D files, we know the donors that contributed and the DNA profiles of the donors. For a
@@ -125,11 +190,22 @@ def load_donor_alleles(file_name: str, panel: Panel) -> List[Marker]:
             for row in reader:
                 marker_allele_strings[row['Marker']].update([row['Allele1'], row['Allele2']])
 
-    # transform into Marker/Allele objects
+    # transform into full Marker/Allele objects
     markers = []
     for marker_name, alleles in marker_allele_strings.items():
         dye_row = panel.get_dye_row(marker_name)
-        markers.append(Marker(dye_row, marker_name, [Allele(a) for a in sorted(alleles)]))
+        if dye_row is None:  # may be missing, e.g. Y-profile   
+            raise TypeError(
+            f"Marker {marker_name} not found in panel {panel}. "
+            "Please check the panel or the marker name."
+        )
+        new_alleles = [
+            Allele(allele_name, *panel.get_allele_info(marker_name, allele_name)) 
+            for allele_name in sorted(alleles)
+        ]
+        new_marker = Marker(dye_row, marker_name, new_alleles)
+
+        markers.append(new_marker)
     return markers
 
 

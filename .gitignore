@@ -162,7 +162,30 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+
+# VS Code
+.vscode/
+
 scratch/
 output/
 mlruns/
 .ruff_cache
+
+
+# MacOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+
+# Custom configuration files
+# Base config files are already included
+/config/
+
+# Python Notebooks
+# Once we want to move to main branch, we can remove Jupyter Notebook files
+# .ipynb
+
+# Data export
+# This folder is only needed when aiming to export extracted electropherogram raw data matrices
+/export/

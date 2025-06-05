@@ -6,7 +6,7 @@ import numpy as np
 
 class Prediction:
     """
-    This class represents a single model prediction.
+    This class represents a single model prediction. That is to say, all the predictions for one electropherogram.
 
     :param classification: A mapping of textual labels to their corresponding
         confidence scores.
