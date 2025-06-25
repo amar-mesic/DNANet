@@ -8,7 +8,10 @@ import confidence
 from confidence import Configuration, dumpf
 
 from DNAnet.data.data_models.base import InMemoryDataset
+from DNAnet.data.data_models.custom_hid_dataset import CustomHIDDataset
 from DNAnet.data.data_models.hid_dataset import HIDDataset
+from DNAnet.data.parsing.file_categorization_strategy import ProvedItFileCategorizer
+from DNAnet.data.validation.sample_validation_strategy import NFIValidationStrategy
 from DNAnet.evaluation import (
     allele_f1_score,
     allele_precision,
@@ -25,7 +28,10 @@ from DNAnet.typing import PathLike
 from utils import get_defaults
 
 
-DATASETS = {'dataset': {'hid': HIDDataset, }}
+DATASETS = {'dataset': {'hid': HIDDataset, 'custom_hid': CustomHIDDataset},
+            'file_categorization_strategy': {'ProvedItFileCategorizer': ProvedItFileCategorizer},
+            'sample_validation_strategy': {'NFIValidationStrategy': NFIValidationStrategy}
+            }
 MODELS = {'model': {'unet': DNANet_UNet, 'human_analysis': HumanAnalysis}}
 METRICS = {'pixel_precision': pixel_precision,
            'pixel_recall': pixel_recall,

@@ -43,11 +43,24 @@ class ProvedItFileCategorizer(FileCategorizationStrategy):
         if "LEA" in fname:
             return "control"
         # Valid sample HID file
-        # TODO: Fix for when more than 2 contributors e.g.: F07_RD14-0003-30_31_32_33_34-1;1;1;1;1-M3e-0.075GF-Q2.0_06.5sec.hid
-        if re.search(r"RD14-0003-(\d+)_(\d+)-(\d+);(\d+)", str(file_name)) is not None:
+        if len(self.extract_contributor_ids(fname)) > 0:
             return "sample"
         # Unknown or unhandled
         return "unknown"
+    
+
+    @staticmethod
+    def extract_contributor_ids(file_name: str):
+        """
+        Extracts all contributor IDs from a ProvedIt filename.
+        Returns a list of integers (IDs), or an empty list if not found.
+        """
+        # Example: F07_RD14-0003-30_31_32_33_34-1;1;1;1;1-M3e-0.075GF-Q2.0_06.5sec.hid
+        match = re.search(r"RD14-0003-([\d_]+)-", file_name)
+        if match:
+            ids = match.group(1).split("_")
+            return [int(i) for i in ids if i.isdigit()]
+        return []
     
 
 

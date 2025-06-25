@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 
 import mlflow
+from neptune import Run
+import neptune
 import torch
 import torchmetrics
 from torch import Tensor
@@ -19,6 +21,7 @@ from DNAnet.allele_callers import NearestBasePairCaller
 from DNAnet.data.data_models.hid_dataset import HIDDataset
 from DNAnet.data.data_models.hid_image import HIDImage
 from DNAnet.data.utils import process_image
+from DNAnet.evaluation.segmentation.allele_metrics import allele_f1_score, allele_precision
 from DNAnet.models.base import TORCH_DEFAULT_DEVICE, TrainableModel
 from DNAnet.models.loss import DiceLoss
 from DNAnet.models.prediction import Prediction
@@ -102,6 +105,7 @@ class DNANet_UNet(TrainableModel):
             checkpoint_dir: PathLike = None,
             save_best: bool = False,
             use_scheduler: bool = False,
+            neptune_run: Optional[Run] = None,
             **kwargs):
         """
         Fits the model on training data.
@@ -209,8 +213,14 @@ class DNANet_UNet(TrainableModel):
                                        optimizer=optimizer,
                                        train=True,
                                        metrics=metrics)
+            
             mlflow.log_metric(key="training_loss", value=training_loss,
                               step=epoch)
+            
+            if neptune_run:
+                neptune_run['training/loss'].log(training_loss, step=epoch) # type: ignore
+                neptune_run['training/accuracy'].log(
+                metrics[0].compute(), step=epoch) # type: ignore
 
             # Update the logs we write to tensorboard.
             summary["Loss"]["training"] = training_loss
@@ -252,6 +262,19 @@ class DNANet_UNet(TrainableModel):
                 mlflow.log_metrics({"validation_loss": validation_loss,
                                     "validation_metric": validation_metric},
                                    step=epoch)
+                
+                if neptune_run:
+                    neptune_run['validation/loss'].log(validation_loss, step=epoch)
+                    neptune_run['validation/accuracy'].log(
+                    validation_metric, step=epoch)
+
+                    predictions = self.predict_batch(validation_set)
+                    neptune_run['validation/f1'].log(allele_f1_score(
+                        validation_set, predictions), step=epoch
+                    )
+                    neptune_run['validation/precision'].log(
+                        allele_precision(validation_set, predictions), step=epoch
+                    )
 
                 # If `save_best` is True, keep track of the model with the best
                 # performance on the validation set so far.
@@ -292,7 +315,7 @@ class DNANet_UNet(TrainableModel):
             shutil.rmtree(checkpoint_dir / 'best_model')
             LOGGER.info("Restored previous best model")
 
-    def set_up_metrics(self, use_evaluation_metric: bool) -> List[Optional[Metric]]:
+    def set_up_metrics(self, use_evaluation_metric: bool) -> List[Metric]:
         """
         Use binary accuracy as evaluation metric if desired.
         """

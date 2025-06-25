@@ -189,3 +189,5 @@ mlruns/
 # Data export
 # This folder is only needed when aiming to export extracted electropherogram raw data matrices
 /export/
+
+.neptune/
