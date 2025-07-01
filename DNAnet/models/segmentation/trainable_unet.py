@@ -7,7 +7,7 @@ from itertools import islice
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 
-import mlflow
+from matplotlib import pyplot as plt
 from neptune import Run
 import neptune
 import torch
@@ -21,7 +21,9 @@ from DNAnet.allele_callers import NearestBasePairCaller
 from DNAnet.data.data_models.hid_dataset import HIDDataset
 from DNAnet.data.data_models.hid_image import HIDImage
 from DNAnet.data.utils import process_image
-from DNAnet.evaluation.segmentation.allele_metrics import allele_f1_score, allele_precision
+from DNAnet.evaluation.segmentation.allele_metrics import allele_f1_score, allele_precision, allele_recall
+from DNAnet.evaluation.segmentation.pixel_metrics import pixel_f1_score, pixel_precision, pixel_recall
+from DNAnet.evaluation.visualizations import plot_profile
 from DNAnet.models.base import TORCH_DEFAULT_DEVICE, TrainableModel
 from DNAnet.models.loss import DiceLoss
 from DNAnet.models.prediction import Prediction
@@ -99,12 +101,14 @@ class DNANet_UNet(TrainableModel):
             weight_decay: float = 0.0005,
             tensorboard: bool = False,
             validation_set: Optional[HIDDataset] = None,
-            min_delta: Optional[float] = 0.01,
+            min_delta: float = 0.01,
+            patience: int = 5,
             steps_per_epoch: Optional[int] = None,
             use_evaluation_metric: bool = True,
             checkpoint_dir: PathLike = None,
             save_best: bool = False,
             use_scheduler: bool = False,
+            scheduler_gamma: float = 0.8,
             neptune_run: Optional[Run] = None,
             **kwargs):
         """
@@ -163,7 +167,7 @@ class DNANet_UNet(TrainableModel):
         if use_scheduler:
             LOGGER.info(f"Setting up exponential scheduler, starting with learning "
                         f"rate {learning_rate}")
-            scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.8)
+            scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=scheduler_gamma)
 
         metrics = self.set_up_metrics(use_evaluation_metric)
 
@@ -213,14 +217,7 @@ class DNANet_UNet(TrainableModel):
                                        optimizer=optimizer,
                                        train=True,
                                        metrics=metrics)
-            
-            mlflow.log_metric(key="training_loss", value=training_loss,
-                              step=epoch)
-            
-            if neptune_run:
-                neptune_run['training/loss'].log(training_loss, step=epoch) # type: ignore
-                neptune_run['training/accuracy'].log(
-                metrics[0].compute(), step=epoch) # type: ignore
+    
 
             # Update the logs we write to tensorboard.
             summary["Loss"]["training"] = training_loss
@@ -246,10 +243,6 @@ class DNANet_UNet(TrainableModel):
                             f"{validation_metric:.6f} | Validation loss: "
                             f"{validation_loss:.6f}")
 
-                mlflow.log_metrics({"validation_loss": validation_loss,
-                                    "validation_metric": validation_metric},
-                                   step=epoch)
-
                 # Update the logs we write to tensorboard.
                 summary["Loss"]["validation"] = validation_loss
                 for metric in metrics:
@@ -259,22 +252,52 @@ class DNANet_UNet(TrainableModel):
                     LOGGER.info(
                         f"{descr} - Validation {metric_name.lower()}: {result:.6f}")
 
-                mlflow.log_metrics({"validation_loss": validation_loss,
-                                    "validation_metric": validation_metric},
-                                   step=epoch)
                 
                 if neptune_run:
-                    neptune_run['validation/loss'].log(validation_loss, step=epoch)
-                    neptune_run['validation/accuracy'].log(
-                    validation_metric, step=epoch)
+                    neptune_run['loss/training'].log(training_loss, step=epoch)
+                    neptune_run['accuracy/training'].log(
+                    metrics[0].compute(), step=epoch)
+
+                    # Log the training and validation loss and metrics to Neptune
+                    neptune_run['loss/validation'].log(validation_loss, step=epoch)
+                    neptune_run['accuracy/validation'].log(validation_metric, step=epoch)
 
                     predictions = self.predict_batch(validation_set)
-                    neptune_run['validation/f1'].log(allele_f1_score(
-                        validation_set, predictions), step=epoch
+                    # Allele-level metrics
+                    neptune_run['allele-f1/validation'].log(
+                        allele_f1_score(validation_set, predictions), step=epoch
                     )
-                    neptune_run['validation/precision'].log(
+                    neptune_run['allele-precision/validation'].log(
                         allele_precision(validation_set, predictions), step=epoch
                     )
+                    neptune_run['allele-recall/validation'].log(
+                        allele_recall(validation_set, predictions), step=epoch
+                    )
+                    # Pixel-level metrics
+                    neptune_run['pixel-f1/validation'].log(
+                        pixel_f1_score(validation_set, predictions), step=epoch
+                    )
+                    neptune_run['pixel-precision/validation'].log(
+                        pixel_precision(validation_set, predictions), step=epoch
+                    )
+                    neptune_run['pixel-recall/validation'].log(
+                        pixel_recall(validation_set, predictions), step=epoch
+                    )
+
+                    # Log images to Neptune
+                    if (epoch % 10 == 0 or epoch == num_epochs - 1):
+                        # Select the image(s) you want to visualize
+                        sample_images = validation_set[:1]  # or any subset
+                        predictions = self.predict_batch(sample_images)
+                        
+                        # Generate the plot (returns a matplotlib Figure)
+                        fig = plot_profile(sample_images, predictions, prediction_as_mask=False, title=True)
+                        
+                        # Log to Neptune (as a plot object)
+                        neptune_run["visualizations/decision_boundary"].append(fig)
+                        plt.close(fig)  # Close the figure to avoid memory leaks
+
+
 
                 # If `save_best` is True, keep track of the model with the best
                 # performance on the validation set so far.
@@ -289,7 +312,7 @@ class DNANet_UNet(TrainableModel):
                 # 5 steps, otherwise we stop
                 if validation_loss < prev_best[0] - min_delta:
                     prev_best = (validation_loss, epoch)
-                elif epoch - prev_best[1] > 5:
+                elif epoch - prev_best[1] > patience:
                     LOGGER.info(f"Early stopping reached at epoch {epoch + 1}.")
                     break
 
@@ -306,6 +329,8 @@ class DNANet_UNet(TrainableModel):
                 LOGGER.info(f"Tensorboard logs written to {writer.log_dir}")
                 LOGGER.info(f"Run `tensorboard --logdir={writer.log_dir}` to view")
                 writer.close()
+
+
 
         # If we kept track of the model with the best performance on the
         # validation set, we want to reload the best performing model's

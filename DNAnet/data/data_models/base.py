@@ -63,8 +63,7 @@ class InMemoryDataset(Sequence[Image]):
         else:
             yield from self._data
 
-    # TODO: add support for slicing
-    def __getitem__(self, index: int) -> Image:
+    def __getitem__(self, index) -> Image:
         return self._data[index]
 
     def split(self, fraction: float, seed: Optional[float] = None) \

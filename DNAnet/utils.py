@@ -54,18 +54,34 @@ def get_prefix_from_filename(file_name: PathLike) -> str:
 # PROVEDIT SPECIFIC
 # Currently only supports 2 contributors
 # TODO: allow for 2-5 contributors
-def get_contributors_from_filename(file_name: PathLike) -> list[str]:
-    match = re.search(r"RD14-0003-(\d+)_(\d+)-(\d+);(\d+)", str(file_name))
+# def get_contributors_from_filename(file_name: PathLike) -> list[str]:
+#     match = re.search(r"RD14-0003-(\d+)_(\d+)-(\d+);(\d+)", str(file_name))
 
-    if match:
-        c1, c2 = match.group(1), match.group(2)
-        # r1, r2 = match.group(3), match.group(4)
-        return [c1, c2]
-    else:
-        raise ValueError(f"Cannot extract prefix from provided file name: {file_name}")
+#     if match:
+#         c1, c2 = match.group(1), match.group(2)
+#         # r1, r2 = match.group(3), match.group(4)
+#         return [c1, c2]
+#     else:
+#         raise ValueError(f"Cannot extract prefix from provided file name: {file_name}")
     
 
-
+def get_contributors_from_filename(file_name: PathLike) -> list[str]:
+    """
+    Extracts all contributor IDs from a ProvedIt filename.
+    Contributors are the numbers separated by underscores after 'RD14-0003-'
+    and before the next '-'.
+    Example:
+        F07_RD14-0003-30_31_32_33_34-1;1;1;1;1-M3e-0.075GF-Q2.0_06.5sec.hid
+        -> ['30', '31', '32', '33', '34']
+    """
+    base_name = os.path.basename(str(file_name))
+    match = re.search(r"RD14-0003-([0-9_]+)-", base_name)
+    if not match:
+        raise ValueError(f"Cannot extract contributors from provided file name: {file_name}")
+    contributors = match.group(1).split('_')
+    if not (2 <= len(contributors) <= 5):
+        raise ValueError(f"Expected 2-5 contributors, found {len(contributors)} in {file_name}")
+    return contributors
 
 
 

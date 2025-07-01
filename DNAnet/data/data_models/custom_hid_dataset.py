@@ -15,6 +15,7 @@ class CustomHIDDataset(InMemoryDataset):
                  panel_path: PathLike, 
                  shuffle: Optional[bool] = False,
                  limit: Optional[int] = None,
+                 adjustment_of_annotations: Optional[str] = None,
                  size_standard: str = InternalSizeStandard.WEN_ILS.value,
                  file_categorization_strategy: FileCategorizationStrategy = lambda file_name: "sample",
                  sample_validation_strategy: SampleValidationStrategy = lambda image: True
@@ -24,13 +25,10 @@ class CustomHIDDataset(InMemoryDataset):
         self.root_path = root_path
         self.files = find_files_by_suffix(root_path, ".hid")
 
-        # if isinstance(panel, PathLike):
-        #     self.panel = Panel(panel)
-        # else:
-        #     self.panel = panel
         self.panel = Panel(panel_path)
 
         self.limit = limit
+        self.adjustment_of_annotations = adjustment_of_annotations
         self.size_standard = size_standard
 
         self.file_categorization_strategy = file_categorization_strategy
@@ -53,6 +51,12 @@ class CustomHIDDataset(InMemoryDataset):
         ]
         
         self._data = validated_images
+
+        if self.adjustment_of_annotations:
+            self._data = [
+                im.adjust_annotations(self.adjustment_of_annotations)
+                for im in self._data
+            ]
 
 
     def __str__(self):

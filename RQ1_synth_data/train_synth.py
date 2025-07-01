@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from datetime import datetime
@@ -5,6 +6,7 @@ from typing import Optional
 
 import neptune
 from confidence import loadf, dumpf, Configuration
+from torch import seed
 
 from DNAnet.evaluation.segmentation.allele_metrics import allele_f1_score, allele_precision, allele_recall
 from config_io import load_config, load_dataset, load_model, load_training_config
@@ -18,24 +20,27 @@ LOGGER = logging.getLogger('dnanet')
 def run(data_config: str,
         model_config: str,
         training_config: str,
-        seed: int = 42,
         checkpoint_dir: Optional[str] = None,
-        output_dir: Optional[str] = None,
-        experiment_name: Optional[str] = None,
+
 ):
-    run = neptune.init_run(
-        name=experiment_name or "Prediction model",
-        # name='bruh',
-        # key="MOD", 
-        project="amar-mesic/dna-thesis", 
-        api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJkOTQ1Njc4MC0yOTcyLTRlMmQtYTMwMy0xOGYxZTAwMmIzZGUifQ==", # your credentials
-    )
+    
+    training_kwargs = load_training_config(training_config)
+    log_neptune = training_kwargs.get('log_neptune', False)
+    seed = training_kwargs.get('seed', 42)
+    experiment_name = training_kwargs.get('experiment_name', "Prediction model")
+
+    if log_neptune:
+        run = neptune.init_run(
+            name=experiment_name,
+            # key="MOD", 
+            project="amar-mesic/dna-thesis", 
+            api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJkOTQ1Njc4MC0yOTcyLTRlMmQtYTMwMy0xOGYxZTAwMmIzZGUifQ==", # your credentials
+        )
 
 
     
     # Set up output directory
-    if output_dir is None:
-        output_dir = os.path.join("output", datetime.now().strftime("%Y%m%d_%H%M%S"))
+    output_dir = os.path.join("output", experiment_name, datetime.now().strftime("%Y%m%d_%H%M%S"))
     os.makedirs(output_dir, exist_ok=True)
 
     # Set up logging to file
@@ -73,10 +78,20 @@ def run(data_config: str,
     val_ratio = split_cfg['val']
     test_ratio = split_cfg['test']
 
+    # Check that proportions add up to 1 (allowing for small floating point error)
+    total = train_ratio + val_ratio + test_ratio
+    if not abs(total - 1.0) < 1e-6:
+        raise ValueError(f"Split proportions must sum to 1.0, but got {total}.")
+
     train_set, val_test_set = dataset.split(train_ratio, seed)
     val_set, test_set = val_test_set.split(val_ratio / (val_ratio + test_ratio), seed)
 
-
+    # Check that all splits contain at least one item
+    if len(train_set) == 0 or len(val_set) == 0 or len(test_set) == 0:
+        raise ValueError(
+            f"Each split must contain at least one item, but got "
+            f"train: {len(train_set)}, val: {len(val_set)}, test: {len(test_set)}"
+        )
 
 
 
@@ -86,9 +101,7 @@ def run(data_config: str,
 
     training_kwargs = load_training_config(training_config)
     training_kwargs.update({'validation_set': val_set})
-
     run['parameters'] = training_kwargs
-
 
 
 
@@ -100,17 +113,17 @@ def run(data_config: str,
         LOGGER.info("Training interrupted!")
 
 
-
-    # Log the final model performance
-    test_predictions = model.predict_batch(test_set)
-    run['test/predictions'] = test_predictions
-    # run['test/loss'] = ...
-    run['test/f1'] = allele_f1_score(test_set, test_predictions)
-    # LOGGER.info(f"Test F1 score: {run['test/f1'].fetch()}")
-    run['test/precision'] = allele_precision(test_set, test_predictions)
-    # LOGGER.info(f"Test Precision: {run['test/precision'].fetch()}")
-    run['test/recall'] = allele_recall(test_set, test_predictions)
-    # LOGGER.info(f"Test Recall: {run['test/recall'].fetch()}
+    if log_neptune:
+        # Log the final model performance
+        test_predictions = model.predict_batch(test_set)
+        run['test/predictions'] = test_predictions
+        # run['test/loss'] = ...
+        run['test/f1'] = allele_f1_score(test_set, test_predictions)
+        # LOGGER.info(f"Test F1 score: {run['test/f1'].fetch()}")
+        run['test/precision'] = allele_precision(test_set, test_predictions)
+        # LOGGER.info(f"Test Precision: {run['test/precision'].fetch()}")
+        run['test/recall'] = allele_recall(test_set, test_predictions)
+        # LOGGER.info(f"Test Recall: {run['test/recall'].fetch()}
 
 
 
@@ -131,7 +144,10 @@ def run(data_config: str,
     LOGGER.info(f"Config written to {config_path}")
 
 
-    run['config'] = complete_config
+    with open(config_path, "r") as f:
+        config_str = f.read()
+    run['config'] = config_str
+
     run.stop()
 
 

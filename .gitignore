@@ -180,7 +180,7 @@ mlruns/
 
 # Custom configuration files
 # Base config files are already included
-/config/
+# /config/
 
 # Python Notebooks
 # Once we want to move to main branch, we can remove Jupyter Notebook files

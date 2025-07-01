@@ -1,0 +1,18 @@
+dataset:
+  name: custom_hid # does it matter? Yes, it decides which constructor is used
+  root_path: /Users/amarmesic/Documents/tudelft/thesis/datasets/USE THIS - PROVEDIt_2-5-Person Profiles_3500 5sec_GF29cycles
+  # reference_genotype_path: resources/data/ProvedIt/References
+  panel_path: resources/data/ProvedIt/SGPanel_Globalfiler_Panel.xml
+  limit: 
+  shuffle: false
+  adjustment_of_annotations: top
+  size_standard: GENESCAN_600_LIZ
+  file_categorization_strategy:
+    name: ProvedItFileCategorizer
+  sample_validation_strategy:
+    name: NFIValidationStrategy
+    
+split:
+  train: 0.8
+  val: 0.1
+  test: 0.1

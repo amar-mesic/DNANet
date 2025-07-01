@@ -180,14 +180,14 @@ def _plot_profile_marker(marker: Marker,
         allele_annotation = image_annotation[dye_row, _slice]
         ax.fill_between(np.arange(len(allele_annotation)), 0, marker_img.max(),
                         where=allele_annotation.flatten() == 1,
-                        color='green', alpha=.4, transform=ax.get_xaxis_transform())
+                        color='green', alpha=.4)
 
     if (prediction and
             (image_prediction := prediction.image) is not None):
         allele_prediction = image_prediction[dye_row, _slice]
         ax.fill_between(np.arange(len(allele_prediction)), 0, marker_img.max(),
                         where=(allele_prediction > .5).astype(int).flatten(),
-                        color='orange', alpha=.4, transform=ax.get_xaxis_transform())
+                        color='orange', alpha=.4)
     ax.title.set_text(marker.name)
 
 
