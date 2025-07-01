@@ -1,6 +1,7 @@
 import contextlib
 import logging
 import os
+import sched
 import shutil
 from collections import defaultdict
 from itertools import islice
@@ -112,6 +113,7 @@ class DNANet_UNet(TrainableModel):
             use_scheduler: bool = False,
             scheduler_type: str = "exponential",
             scheduler_gamma: float = 0.8,
+            pct_start: float = 0.1,
             neptune_run: Optional[Run] = None,
             **kwargs):
         """
@@ -176,7 +178,7 @@ class DNANet_UNet(TrainableModel):
 
             elif scheduler_type == "warmup_cosine":
                 # 1. Warmup: linearly increase lr from 0.1*base_lr to base_lr
-                warmup_scheduler = LinearLR(optimizer, start_factor=min_lr, end_factor=learning_rate, total_iters=num_epochs//10)
+                warmup_scheduler = LinearLR(optimizer, start_factor=1., end_factor=learning_rate/min_lr, total_iters=num_epochs//10)
 
                 # 2. Cosine annealing: decay lr for the rest of the epochs
                 cosine_scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs-num_epochs//10, eta_min=min_lr)
@@ -186,6 +188,19 @@ class DNANet_UNet(TrainableModel):
                     optimizer,
                     schedulers=[warmup_scheduler, cosine_scheduler],
                     milestones=[num_epochs//10]  # switch to cosine after 10 epochs
+                )
+
+            elif scheduler_type == "OneCycleLR":
+                LOGGER.info(f"Setting up OneCycleLR scheduler, starting with learning "
+                            f"rate {learning_rate}")
+                scheduler = torch.optim.lr_scheduler.OneCycleLR(
+                    optimizer,
+                    max_lr=learning_rate,
+                    total_steps=num_epochs * (len(dataset) // batch_size),
+                    pct_start=pct_start,
+                    anneal_strategy='cos',
+                    div_factor=learning_rate/min_lr,
+                    final_div_factor=learning_rate/min_lr
                 )
 
         metrics = self.set_up_metrics(use_evaluation_metric)

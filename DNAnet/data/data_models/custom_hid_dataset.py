@@ -34,15 +34,15 @@ class CustomHIDDataset(InMemoryDataset):
         self.file_categorization_strategy = file_categorization_strategy
         self.sample_validation_strategy = sample_validation_strategy
 
-        categorized_files = categorize_files(self.files, self.file_categorization_strategy)
-        sample_files = categorized_files["sample"]
+        self.categorized_files = categorize_files(self.files, self.file_categorization_strategy)
+        self.sample_files = self.categorized_files["sample"]
 
         if limit is not None:
-            sample_files = sample_files[:limit]
+            self.sample_files = self.sample_files[:limit]
 
         unvalidated_images = [
             HIDImage(path=f, panel=self.panel, size_standard=self.size_standard)
-            for f in sample_files
+            for f in self.sample_files
         ]
 
         validated_images = [

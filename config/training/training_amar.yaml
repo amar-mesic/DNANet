@@ -3,13 +3,14 @@ training:
   checkpoint_dir: "checkpoints/"
   log_neptune: true
   batch_size: 32
-  num_epochs: 100
+  num_epochs: 200
   steps_per_epoch:
   use_evaluation_metric: true
   save_best: true
   use_scheduler: true
-  scheduler_type: "warmup_cosine"
+  scheduler_type: "exponential"  # "exponential", "warmup_cosine", "OneCycleLR"
   scheduler_gamma: 0.9
+  pct_start: 0.1
   min_lr: 0.0001
   early_stopping: true
   min_delta: 0.000              # set to -99999 for no early stopping
