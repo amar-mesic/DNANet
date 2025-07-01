@@ -256,11 +256,12 @@ class HIDImage(Image):
                                                           self.THRESHOLD)
 
                 if peak_idx.size == 0:
-                    LOGGER.warning(f"No peak found above {self.THRESHOLD}rfu. "
-                                   f"Original annotation is removed "
-                                   "and no adjustment is applied "
-                                   f"({self.path}, dye {layer}, bin {ann_group}, "
-                                   f"rfus {dye[ann_group].flatten()}).")
+                    # LOGGER.warning(f"No peak found above {self.THRESHOLD}rfu. "
+                    #                f"Original annotation is removed "
+                    #                "and no adjustment is applied "
+                    #                f"({self.path}, dye {layer}, bin {ann_group}, "
+                    #                f"rfus {dye[ann_group].flatten()}).")
+                    pass
                 else:
                     if adjustment_type == 'complete':
                         # find the boundary of the peak and annotate the range

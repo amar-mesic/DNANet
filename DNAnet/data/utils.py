@@ -103,7 +103,7 @@ def validate_ss_peaks(
     passes_validation = bool(np.all((relative_distances <= max_pixels_per_bp) & (relative_distances >= min_pixels_per_bp)))
     if passes_validation:
         return True
-    LOGGER.warning("Size standard peaks validation failed. Trying validation only scan points after 4000")
+    # LOGGER.warning("Size standard peaks validation failed. Trying validation only scan points after 4000")
     
     # Temporary fix: only look at last 20 peaks
     # since first few peaks are often not ILS peaks, but primer flares.
