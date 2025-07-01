@@ -16,6 +16,7 @@ from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 from torchmetrics import Metric
 from tqdm import tqdm
+from torch.optim.lr_scheduler import CosineAnnealingLR, SequentialLR, LinearLR
 
 from DNAnet.allele_callers import NearestBasePairCaller
 from DNAnet.data.data_models.hid_dataset import HIDDataset
@@ -97,7 +98,8 @@ class DNANet_UNet(TrainableModel):
             dataset: HIDDataset,
             batch_size: int = 4,
             num_epochs: int = 10,
-            learning_rate: float = 0.005,
+            learning_rate: float = 0.01,
+            min_lr: float = 0.0001,
             weight_decay: float = 0.0005,
             tensorboard: bool = False,
             validation_set: Optional[HIDDataset] = None,
@@ -108,6 +110,7 @@ class DNANet_UNet(TrainableModel):
             checkpoint_dir: PathLike = None,
             save_best: bool = False,
             use_scheduler: bool = False,
+            scheduler_type: str = "exponential",
             scheduler_gamma: float = 0.8,
             neptune_run: Optional[Run] = None,
             **kwargs):
@@ -163,11 +166,27 @@ class DNANet_UNet(TrainableModel):
         optimizer = torch.optim.Adam(self._model.parameters(),
                                      lr=learning_rate,
                                      weight_decay=weight_decay)
+        
         # Setup scheduler to decrease the learning rate exponentially after every epoch
         if use_scheduler:
-            LOGGER.info(f"Setting up exponential scheduler, starting with learning "
-                        f"rate {learning_rate}")
-            scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=scheduler_gamma)
+            if scheduler_type == "exponential":
+                LOGGER.info(f"Setting up exponential scheduler, starting with learning "
+                            f"rate {learning_rate}")
+                scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=scheduler_gamma)
+
+            elif scheduler_type == "warmup_cosine":
+                # 1. Warmup: linearly increase lr from 0.1*base_lr to base_lr
+                warmup_scheduler = LinearLR(optimizer, start_factor=min_lr, end_factor=learning_rate, total_iters=num_epochs//10)
+
+                # 2. Cosine annealing: decay lr for the rest of the epochs
+                cosine_scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs-num_epochs//10, eta_min=min_lr)
+
+                # 3. Chain them
+                scheduler = SequentialLR(
+                    optimizer,
+                    schedulers=[warmup_scheduler, cosine_scheduler],
+                    milestones=[num_epochs//10]  # switch to cosine after 10 epochs
+                )
 
         metrics = self.set_up_metrics(use_evaluation_metric)
 
@@ -255,8 +274,8 @@ class DNANet_UNet(TrainableModel):
                 
                 if neptune_run:
                     neptune_run['loss/training'].log(training_loss, step=epoch)
-                    neptune_run['accuracy/training'].log(
-                    metrics[0].compute(), step=epoch)
+                    # neptune_run['accuracy/training'].log(
+                    # metrics[0].compute(), step=epoch)
 
                     # Log the training and validation loss and metrics to Neptune
                     neptune_run['loss/validation'].log(validation_loss, step=epoch)
@@ -282,6 +301,11 @@ class DNANet_UNet(TrainableModel):
                     )
                     neptune_run['pixel-recall/validation'].log(
                         pixel_recall(validation_set, predictions), step=epoch
+                    )
+
+                    # Log the learning rate to Neptune
+                    neptune_run['learning-rate'].log(
+                        optimizer.param_groups[0]["lr"], step=epoch
                     )
 
                     # Log images to Neptune
