@@ -1,5 +1,5 @@
 training:
-  experiment_name: depr # e.g. "real_data-best_unet-use_scheduler-delta_-0.01"
+  experiment_name: test ReduceLROnPlateau # e.g. "real_data-best_unet-use_scheduler-delta_-0.01"
   checkpoint_dir: "checkpoints/"
   log_neptune: true
   batch_size: 32
@@ -8,14 +8,14 @@ training:
   use_evaluation_metric: true
   save_best: true
   use_scheduler: true
-  scheduler_type: "exponential"  # "exponential", "warmup_cosine", "OneCycleLR"
-  scheduler_gamma: 0.9
+  scheduler_type: "ReduceLROnPlateau"  # "exponential", "warmup_cosine", "OneCycleLR", "ReduceLROnPlateau"
+  learning_rate: 0.01
+  scheduler_gamma: 0.8
   pct_start: 0.1
   min_lr: 0.0001
   early_stopping: true
-  min_delta: 0.000              # set to -99999 for no early stopping
+  min_delta: 0.000              # -1 -> no early stopping
   patience: 20
-  learning_rate: 0.01
   weight_decay: 0.0001
   tensorboard: false
   seed: 42

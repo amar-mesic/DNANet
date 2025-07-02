@@ -17,7 +17,7 @@ from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 from torchmetrics import Metric
 from tqdm import tqdm
-from torch.optim.lr_scheduler import CosineAnnealingLR, SequentialLR, LinearLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, SequentialLR, LinearLR, OneCycleLR, ExponentialLR, ReduceLROnPlateau
 
 from DNAnet.allele_callers import NearestBasePairCaller
 from DNAnet.data.data_models.hid_dataset import HIDDataset
@@ -193,14 +193,23 @@ class DNANet_UNet(TrainableModel):
             elif scheduler_type == "OneCycleLR":
                 LOGGER.info(f"Setting up OneCycleLR scheduler, starting with learning "
                             f"rate {learning_rate}")
-                scheduler = torch.optim.lr_scheduler.OneCycleLR(
+                scheduler = OneCycleLR(
                     optimizer,
                     max_lr=learning_rate,
-                    total_steps=num_epochs * (len(dataset) // batch_size),
+                    total_steps=num_epochs, #* (len(dataset) // batch_size),
                     pct_start=pct_start,
                     anneal_strategy='cos',
                     div_factor=learning_rate/min_lr,
                     final_div_factor=learning_rate/min_lr
+                )
+
+            elif scheduler_type == "ReduceLROnPlateau":
+                scheduler = ReduceLROnPlateau(
+                    optimizer,
+                    mode='min',        # 'min' for loss, 'max' for accuracy
+                    factor=scheduler_gamma,
+                    patience=5,
+                    min_lr=min_lr
                 )
 
         metrics = self.set_up_metrics(use_evaluation_metric)
@@ -356,7 +365,12 @@ class DNANet_UNet(TrainableModel):
                     break
 
             if use_scheduler:
-                self.update_scheduler(descr, optimizer, scheduler)
+                if isinstance(scheduler, ReduceLROnPlateau):
+                    scheduler.step(validation_loss)
+                else:
+                    scheduler.step()
+                new_lr = optimizer.param_groups[0]["lr"]
+                LOGGER.info(f"{descr}: scheduler decreased learning rate to {new_lr}")
 
             # Write any logs to tensorboard if possible
             if writer and summary:
@@ -388,14 +402,7 @@ class DNANet_UNet(TrainableModel):
         else:
             metrics = [torchmetrics.classification.BinaryAccuracy()]
         return [metric.to(self._device) for metric in metrics]
-
-    @staticmethod
-    def update_scheduler(descr: str,
-                         optimizer: torch.optim.Optimizer,
-                         scheduler: torch.optim.lr_scheduler.LRScheduler):
-        scheduler.step()
-        new_lr = optimizer.param_groups[0]["lr"]
-        LOGGER.info(f"{descr}: scheduler decreased learning rate to {new_lr}")
+    
 
     def epoch(self,
               batches: Iterator[Sequence[HIDImage]],
