@@ -1,8 +1,9 @@
 dataset:
   name: synth_data # does it matter? Yes, it decides which constructor is used
   root_path: /Users/amarmesic/Documents/tudelft/thesis/DNANet/resources/data/synthetic/fixed_ratios_base_template_500_5000_no_preprocess
-  # reference_genotype_path: resources/data/ProvedIt/References
   panel_path: resources/data/synthetic/SGPanel_Globalfiler_Panel.xml
+  reference_genotype_path: resources/data/synthetic/fixed_ratios_base_template_500_5000_no_preprocess/reference_genotypes
+  epg_to_genotypes_mapping_path: resources/data/synthetic/fixed_ratios_base_template_500_5000_no_preprocess/alleles_to_genotypes_mapping.csv
   limit: 
   shuffle: false
   adjustment_of_annotations: top

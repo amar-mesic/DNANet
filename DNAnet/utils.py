@@ -120,23 +120,20 @@ def dict_to_marker_list(marker_dict: Union[List[Dict], str], as_json: bool = Fal
     return markers_list
 
 
-def load_donor_alleles_synthetic_data(path: str, panel: Panel) -> list[Marker]:
+def load_donor_alleles_synthetic_data(path: str, panel: Panel, reference_genotype_path: str, epg_to_genotypes_mapping_path: str) -> list[Marker]:
     """
     For synthetic files, find the donors (from the file path) and return the list of Markers of those donors combined.
     :param path: path to the .npy file to load actual donors for
     :param panel: the panel to retrieve the dye row of the markers from
     """
-    import os
-    reference_path = "resources/data/synthetic/fixed_ratios_base_template_500_5000_no_preprocess/reference_genotypes"
     # Use the file name (with extension) for mapping lookup
     file_name = os.path.basename(path)
-    search_root = os.path.dirname(path)
-    contributors = get_contributors_from_alleles_to_genotypes_mapping(file_name, search_root=search_root)
+    contributors = get_contributors_from_alleles_to_genotypes_mapping(file_name, epg_to_genotypes_mapping_path)
 
     # find the set of all alleles of the donors per marker
     marker_allele_strings = defaultdict(set)
     for file_name in contributors:
-        reference_profiles_path = os.path.join(reference_path, file_name)
+        reference_profiles_path = os.path.join(reference_genotype_path, file_name)
         with open(reference_profiles_path, "r") as f:
             reader = csv.DictReader(f, delimiter=",")
             for row in reader:
@@ -290,37 +287,16 @@ def chunks(
         yield chunk
 
 
-def get_contributors_from_alleles_to_genotypes_mapping(file_name: str, search_root: Optional[str] = None) -> list[str]:
+# def get_contributors_from_alleles_to_genotypes_mapping(file_name: str, search_root: Optional[str] = None) -> list[str]:
+def get_contributors_from_alleles_to_genotypes_mapping(file_name: str, map_file_path: str) -> list[str]:
+
     """
     Given a synthetic EPG file name (stem or path), return the list of contributor IDs using the alleles_to_genotypes_mapping.csv file.
     If file_name is a stem, search_root must be provided and should be the directory containing the mapping file or EPGs.
     """
-    import os
-    # Determine the starting directory for the search
-    if os.path.sep in file_name or (search_root is None and os.path.exists(file_name)):
-        # file_name is a path
-        search_path = os.path.dirname(os.path.abspath(file_name))
-    elif search_root is not None:
-        search_path = os.path.abspath(search_root)
-    else:
-        raise ValueError("If file_name is not a path, you must provide search_root (directory containing mapping file or EPGs).")
-    
     file_stem = os.path.splitext(os.path.basename(file_name))[0]
 
-    mapping_file = None
-    while True:
-        candidate = os.path.join(search_path, 'alleles_to_genotypes_mapping.csv')
-        if os.path.exists(candidate):
-            mapping_file = candidate
-            break
-        parent = os.path.dirname(search_path)
-        if parent == search_path:
-            break
-        search_path = parent
-    if mapping_file is None:
-        raise FileNotFoundError("alleles_to_genotypes_mapping.csv not found in parent directories.")
-
-    with open(mapping_file, 'r', encoding='utf-8') as f:
+    with open(map_file_path, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
             row_stem = os.path.splitext(row['EPGFile'])[0]

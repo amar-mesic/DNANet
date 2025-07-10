@@ -13,6 +13,8 @@ class SyntheticDataset(InMemoryDataset):
     def __init__(self, 
                  root_path: PathLike,
                  panel_path: PathLike, 
+                 reference_genotype_path: PathLike,
+                 epg_to_genotypes_mapping_path: PathLike,
                  shuffle: Optional[bool] = False,
                  limit: Optional[int] = None,
                  adjustment_of_annotations: Optional[str] = None,
@@ -26,6 +28,8 @@ class SyntheticDataset(InMemoryDataset):
         self.files = find_files_by_suffix(root_path, ".npy")
 
         self.panel = Panel(panel_path)
+        self.reference_genotype_path = reference_genotype_path
+        self.epg_to_genotypes_mapping_path = epg_to_genotypes_mapping_path
 
         self.limit = limit
         self.adjustment_of_annotations = adjustment_of_annotations
@@ -41,7 +45,7 @@ class SyntheticDataset(InMemoryDataset):
             self.sample_files = self.sample_files[:limit]
 
         unvalidated_images = [
-            SyntheticImage(path=f, panel=self.panel, size_standard=self.size_standard)
+            SyntheticImage(path=f, panel=self.panel, size_standard=self.size_standard, reference_genotype_path=self.reference_genotype_path, epg_to_genotypes_mapping_path=self.epg_to_genotypes_mapping_path)
             for f in self.sample_files
         ]
 

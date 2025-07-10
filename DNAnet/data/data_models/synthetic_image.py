@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, Dict, MutableMapping, Optional, Tuple
 
 import numpy as np
+import referencing
 
 from DNAnet.data.data_models import Annotation, Panel
 from DNAnet.data.data_models.base import Image
@@ -28,19 +29,21 @@ class SyntheticImage(Image):
     def __init__(self,
                  path: PathLike,
                  panel: Panel,
+                 reference_genotype_path: str,
+                 epg_to_genotypes_mapping_path: str,
                  use_cache: bool = True,
                  meta: Optional[MutableMapping[str, Any]] = None,
                  size_standard: str = InternalSizeStandard.WEN_ILS.value,
-                 include_size_standard: bool = False,
-                 annotations_file: Optional[str] = None):
+                 include_size_standard: bool = False):
         self.path = path if isinstance(path, Path) else Path(path)
         self._panel = panel
+        self.reference_genotype_path = reference_genotype_path
+        self.epg_to_genotypes_mapping_path = epg_to_genotypes_mapping_path
         self.use_cache = use_cache
         self._meta = meta or dict()
         self._data: Optional[np.ndarray] = None
         self.size_standard = size_standard
         self.include_size_standard = include_size_standard
-        self.annotations_file = annotations_file
         self._scaler: Optional[np.ndarray] = None
 
     @property
@@ -105,7 +108,7 @@ class SyntheticImage(Image):
         # This is ofc hardcoded for the ProvedIt dataset for now
         # if self.annotation is None and self._panel:
         try:
-            true_alleles = load_donor_alleles_synthetic_data(self.path, self._panel)
+            true_alleles = load_donor_alleles_synthetic_data(str(self.path), self._panel, self.reference_genotype_path, self.epg_to_genotypes_mapping_path)
             segmentation = self._get_segmentation(true_alleles, data.shape)
             self._annotation = Annotation(image=segmentation)
             self._meta["called_alleles"] = true_alleles
