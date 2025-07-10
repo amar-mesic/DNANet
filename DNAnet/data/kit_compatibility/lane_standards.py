@@ -7,6 +7,7 @@ from numpy.typing import NDArray
 class InternalSizeStandard(Enum):
     GENESCAN_600_LIZ = "GENESCAN_600_LIZ"
     WEN_ILS = "WEN_ILS"
+    SYNTHETIC_GENESCAN_600_LIZ = "SYNTHETIC_GENESCAN_600_LIZ"
     # Add more standards as needed
 
 
@@ -22,17 +23,21 @@ GENESCAN_600_LIZ_BPS: NDArray[np.int_] = np.array([60, 80, 100, 114, 120, 140, 1
 WEN_ILS_BPS: NDArray[np.int_] = np.array([65, 80, 100, 120, 140, 160, 180,
                                           200, 225, 250, 275, 300, 325,
                                           350, 375, 400, 425, 450, 475], dtype=int)
+# For synthetic data, we use the same values as GENESCAN_600_LIZ, except we exclude the last 7 values
+# Why? because last 2-7 values are non-existent in syntetic data, and 1 is just not registered in DNANET.
+SYNTHETIC_GENESCAN_600_LIZ_BPS: NDArray[np.int_] = GENESCAN_600_LIZ_BPS[:26] 
 
 
 # Mapping from enum or string to BPS array
 SIZE_STANDARD_BPS_MAP = {
     InternalSizeStandard.GENESCAN_600_LIZ: GENESCAN_600_LIZ_BPS,
     InternalSizeStandard.WEN_ILS: WEN_ILS_BPS,
+    InternalSizeStandard.SYNTHETIC_GENESCAN_600_LIZ: SYNTHETIC_GENESCAN_600_LIZ_BPS,
     # Add more mappings as needed
 }
 
 # All supported size standards for compatibility checks
-ALL_SIZE_STANDARDS = [WEN_ILS_BPS, GENESCAN_600_LIZ_BPS]
+ALL_SIZE_STANDARDS = [WEN_ILS_BPS, GENESCAN_600_LIZ_BPS, SYNTHETIC_GENESCAN_600_LIZ_BPS]
 
 
 

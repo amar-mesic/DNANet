@@ -63,6 +63,10 @@ class ProvedItFileCategorizer(FileCategorizationStrategy):
         return []
     
 
+class SyntheticFileCategorizer(FileCategorizationStrategy):
+    def __call__(self, file_name: str) -> FileCategory: return "sample"
+    
+
 
 
 from typing import List, Dict

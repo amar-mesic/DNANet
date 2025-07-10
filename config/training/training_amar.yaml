@@ -1,5 +1,5 @@
 training:
-  experiment_name: test ReduceLROnPlateau # e.g. "real_data-best_unet-use_scheduler-delta_-0.01"
+  experiment_name: test synth # e.g. "real_data-best_unet-use_scheduler-delta_-0.01"
   checkpoint_dir: "checkpoints/"
   log_neptune: true
   batch_size: 32

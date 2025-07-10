@@ -49,20 +49,6 @@ def get_prefix_from_filename(file_name: PathLike) -> str:
         raise ValueError(f"Cannot take prefix from provided file name: {file_name}")
     
 
-
-
-# PROVEDIT SPECIFIC
-# Currently only supports 2 contributors
-# TODO: allow for 2-5 contributors
-# def get_contributors_from_filename(file_name: PathLike) -> list[str]:
-#     match = re.search(r"RD14-0003-(\d+)_(\d+)-(\d+);(\d+)", str(file_name))
-
-#     if match:
-#         c1, c2 = match.group(1), match.group(2)
-#         # r1, r2 = match.group(3), match.group(4)
-#         return [c1, c2]
-#     else:
-#         raise ValueError(f"Cannot extract prefix from provided file name: {file_name}")
     
 
 def get_contributors_from_filename(file_name: PathLike) -> list[str]:
@@ -132,6 +118,47 @@ def dict_to_marker_list(marker_dict: Union[List[Dict], str], as_json: bool = Fal
         marker['alleles'] = [Allele(**a) for a in marker['alleles']]
         markers_list.append(Marker(**marker))
     return markers_list
+
+
+def load_donor_alleles_synthetic_data(path: str, panel: Panel) -> list[Marker]:
+    """
+    For synthetic files, find the donors (from the file path) and return the list of Markers of those donors combined.
+    :param path: path to the .npy file to load actual donors for
+    :param panel: the panel to retrieve the dye row of the markers from
+    """
+    import os
+    reference_path = "resources/data/synthetic/fixed_ratios_base_template_500_5000_no_preprocess/reference_genotypes"
+    # Use the file name (with extension) for mapping lookup
+    file_name = os.path.basename(path)
+    search_root = os.path.dirname(path)
+    contributors = get_contributors_from_alleles_to_genotypes_mapping(file_name, search_root=search_root)
+
+    # find the set of all alleles of the donors per marker
+    marker_allele_strings = defaultdict(set)
+    for file_name in contributors:
+        reference_profiles_path = os.path.join(reference_path, file_name)
+        with open(reference_profiles_path, "r") as f:
+            reader = csv.DictReader(f, delimiter=",")
+            for row in reader:
+                marker_allele_strings[row['Locus']].update([row['Allele1'], row['Allele2']])
+
+    # transform into Marker/Allele objects
+    markers = []
+    for marker_name, alleles in marker_allele_strings.items():
+        dye_row = panel.get_dye_row(marker_name)
+        if dye_row is None:  # may be missing, e.g. Y-profile   
+            raise TypeError(
+            f"Marker {marker_name} not found in panel {panel}. "
+            "Please check the panel or the marker name."
+        )
+        new_alleles = [
+            Allele(allele_name, *panel.get_allele_info(marker_name, allele_name)) 
+            for allele_name in sorted(alleles)
+        ]
+        new_marker = Marker(dye_row, marker_name, new_alleles)
+        markers.append(new_marker)
+    return markers
+
 
 
 def load_donor_alleles_provedit(file_name: str, panel: Panel) -> list[Marker]:
@@ -261,3 +288,44 @@ def chunks(
         if not chunk or skip_remainder and len(chunk) < chunk_size:
             return
         yield chunk
+
+
+def get_contributors_from_alleles_to_genotypes_mapping(file_name: str, search_root: Optional[str] = None) -> list[str]:
+    """
+    Given a synthetic EPG file name (stem or path), return the list of contributor IDs using the alleles_to_genotypes_mapping.csv file.
+    If file_name is a stem, search_root must be provided and should be the directory containing the mapping file or EPGs.
+    """
+    import os
+    # Determine the starting directory for the search
+    if os.path.sep in file_name or (search_root is None and os.path.exists(file_name)):
+        # file_name is a path
+        search_path = os.path.dirname(os.path.abspath(file_name))
+    elif search_root is not None:
+        search_path = os.path.abspath(search_root)
+    else:
+        raise ValueError("If file_name is not a path, you must provide search_root (directory containing mapping file or EPGs).")
+    
+    file_stem = os.path.splitext(os.path.basename(file_name))[0]
+
+    mapping_file = None
+    while True:
+        candidate = os.path.join(search_path, 'alleles_to_genotypes_mapping.csv')
+        if os.path.exists(candidate):
+            mapping_file = candidate
+            break
+        parent = os.path.dirname(search_path)
+        if parent == search_path:
+            break
+        search_path = parent
+    if mapping_file is None:
+        raise FileNotFoundError("alleles_to_genotypes_mapping.csv not found in parent directories.")
+
+    with open(mapping_file, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            row_stem = os.path.splitext(row['EPGFile'])[0]
+            if row_stem == file_stem:
+                # Split the GenotypeFile field by comma and strip whitespace
+                genotype_files = [g.strip() for g in row['GenotypeFile'].split(',') if g.strip()]
+                return genotype_files
+    raise ValueError(f"No contributors found for file {file_name} in mapping.")

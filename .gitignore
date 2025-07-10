@@ -187,6 +187,8 @@ mlruns/
 # .ipynb
 
 # Data export
+resources/data/synthetic/
+
 # This folder is only needed when aiming to export extracted electropherogram raw data matrices
 /export/
 
