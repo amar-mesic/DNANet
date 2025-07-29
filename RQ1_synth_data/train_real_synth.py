@@ -46,8 +46,9 @@ def run(real_data_config: str,
     add_file_handler_to_logger(LOGGER, path=log_path)
     LOGGER.info(f"Logs will be written to {log_path}")
 
-    # Use new default split # TODO: fix this to be variable
-    split_cfg = {'train': 0.6, 'val': 0.2, 'test': 0.2}
+    # Load the full config, not just dataset
+    full_config = load_config(real_data_config, kind='data')
+    split_cfg = full_config.get('split', {'train': 0.8, 'val': 0.1, 'test': 0.1})
 
     # Load datasets
     real_dataset = load_dataset(real_data_config)
@@ -138,8 +139,7 @@ def run(real_data_config: str,
         config_path,
         os.path.join("config", "data", real_data_config),
         os.path.join("config", "models", model_config),
-        os.path.join("config", "training", training_config),
-        split_cfg
+        os.path.join("config", "training", training_config)
     )
     LOGGER.info(f"Config written to {config_path}")
 
@@ -154,15 +154,12 @@ def simple_dump_config(
     path: str,
     data_config_path: str,
     model_config_path: str,
-    training_config_path: str,
-    split_cfg: dict
+    training_config_path: str
 ):
     config = {}
     config['data'] = dict(loadf(data_config_path))
     config['model'] = dict(loadf(model_config_path))
     if training_config_path:
         config['training'] = dict(loadf(training_config_path))
-    if split_cfg:
-        config['split'] = split_cfg
     dumpf(Configuration(config), path)
     return config

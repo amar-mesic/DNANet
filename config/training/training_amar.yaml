@@ -1,5 +1,5 @@
 training:
-  experiment_name: test synth # e.g. "real_data-best_unet-use_scheduler-delta_-0.01"
+  experiment_name: 最好U网-310真:256假-早停-lr0.0005-不用调度-第1
   checkpoint_dir: "checkpoints/"
   log_neptune: true
   batch_size: 32
@@ -7,15 +7,14 @@ training:
   steps_per_epoch:
   use_evaluation_metric: true
   save_best: true
-  use_scheduler: true
-  scheduler_type: "ReduceLROnPlateau"  # "exponential", "warmup_cosine", "OneCycleLR", "ReduceLROnPlateau"
-  learning_rate: 0.01
+  use_scheduler: false
+  scheduler_type: # "exponential", "warmup_cosine", "OneCycleLR", "ReduceLROnPlateau"
+  learning_rate: 0.0005
   scheduler_gamma: 0.8
-  pct_start: 0.1
+  pct_start: 0.5
   min_lr: 0.0001
-  early_stopping: true
-  min_delta: 0.000              # -1 -> no early stopping
-  patience: 20
+  min_delta: 0.0             # -1 -> no early stopping
+  patience: 10
   weight_decay: 0.0001
   tensorboard: false
   seed: 42

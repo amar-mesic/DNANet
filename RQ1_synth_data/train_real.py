@@ -138,8 +138,7 @@ def run(data_config: str,
         config_path,
         os.path.join("config", "data", data_config),
         os.path.join("config", "models", model_config),
-        os.path.join("config", "training", training_config),
-        split_cfg
+        os.path.join("config", "training", training_config)
     )
     LOGGER.info(f"Config written to {config_path}")
 
@@ -159,15 +158,12 @@ def simple_dump_config(
     path: str,
     data_config_path: str,
     model_config_path: str,
-    training_config_path: str,
-    split_cfg: dict
+    training_config_path: str
 ):
     config = {}
     config['data'] = dict(loadf(data_config_path))
     config['model'] = dict(loadf(model_config_path))
     if training_config_path:
         config['training'] = dict(loadf(training_config_path))
-    if split_cfg:
-        config['split'] = split_cfg
     dumpf(Configuration(config), path)
     return config
