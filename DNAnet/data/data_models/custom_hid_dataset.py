@@ -7,6 +7,7 @@ from DNAnet.data.parsing.file_categorization_strategy import FileCategorizationS
 from DNAnet.data.parsing.file_parsing import find_files_by_suffix
 from DNAnet.data.validation.sample_validation_strategy import SampleValidationStrategy
 from DNAnet.typing import PathLike
+from DNAnet.utils import LOGGER
 
 
 class CustomHIDDataset(InMemoryDataset):
@@ -37,8 +38,13 @@ class CustomHIDDataset(InMemoryDataset):
         self.categorized_files = categorize_files(self.files, self.file_categorization_strategy)
         self.sample_files = self.categorized_files["sample"]
 
+        LOGGER.info(f"Found {len(self.sample_files)} files in {self.root_path}")
         if limit is not None:
             self.sample_files = self.sample_files[:limit]
+            LOGGER.info(f"Limiting dataset to {self.limit}")
+        # print the number of files found
+        LOGGER.info(f"Number of files limited to: {len(self.sample_files)}")
+        
 
         unvalidated_images = [
             HIDImage(path=f, panel=self.panel, size_standard=self.size_standard)
@@ -49,6 +55,7 @@ class CustomHIDDataset(InMemoryDataset):
             image for image in unvalidated_images
             if self.sample_validation_strategy(image)
         ]
+        LOGGER.info(f"Number of valid images: {len(validated_images)}")
         
         self._data = validated_images
 
