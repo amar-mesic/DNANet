@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional, Union
 from DNAnet.data.data_models.base import InMemoryDataset
 from DNAnet.data.data_models.dna_models import Panel
@@ -7,7 +8,9 @@ from DNAnet.data.parsing.file_categorization_strategy import FileCategorizationS
 from DNAnet.data.parsing.file_parsing import find_files_by_suffix
 from DNAnet.data.validation.sample_validation_strategy import SampleValidationStrategy
 from DNAnet.typing import PathLike
-from DNAnet.utils import LOGGER
+
+
+LOGGER = logging.getLogger('dnanet')
 
 
 class CustomHIDDataset(InMemoryDataset):
