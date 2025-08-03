@@ -65,7 +65,11 @@ def run(real_data_config: str,
     train_set, val_test_set = real_dataset.split(train_ratio, seed)
     val_set, test_set = val_test_set.split(val_ratio / (val_ratio + test_ratio), seed)
 
-    if len(train_set) == 0 or len(val_set) == 0 or len(test_set) == 0:
+    # log a warning if the train set is empty
+    if len(train_set) == 0:
+        LOGGER.warning("Training set is empty. No real samples to train on.")
+        
+    if len(val_set) == 0 or len(test_set) == 0:
         raise ValueError(
             f"Each split must contain at least one item, but got "
             f"train: {len(train_set)}, val: {len(val_set)}, test: {len(test_set)}"

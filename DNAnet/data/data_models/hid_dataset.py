@@ -363,7 +363,7 @@ class HIDDataset(InMemoryDataset):
 
     def split(self, fraction: float, seed: Optional[float] = None) \
             -> Tuple['SimpleDataset', 'SimpleDataset']:
-        if not 0 < fraction < 1:
+        if not 0 <= fraction <= 1:
             raise ValueError(f"Fraction should be between 0 and 1, got {fraction}.")
 
         if self.group_replicas_in_split:

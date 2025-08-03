@@ -74,7 +74,7 @@ class InMemoryDataset(Sequence[Image]):
         :param seed: An optional seed to make the split deterministic.
         :return: Two datasets each holding a random subset of the original data.
         """
-        if not 0 < fraction < 1:
+        if not 0 <= fraction <= 1:
             raise ValueError(f"Fraction should be between 0 and 1, got {fraction}.")
 
         random.seed(seed)
