@@ -7,6 +7,7 @@ from typing import Optional
 import neptune
 from confidence import loadf, dumpf, Configuration
 from torch import seed
+import random
 
 from DNAnet.evaluation.segmentation.allele_metrics import allele_f1_score, allele_precision, allele_recall
 from config_io import load_config, load_dataset, load_model, load_training_config
@@ -22,7 +23,7 @@ def run(real_data_config: str,
         synth_data_config: str,
         model_config: str,
         training_config: str,
-        ratio: float = 100,
+        ratio: float = 1,
         checkpoint_dir: Optional[str] = None):
     
     training_kwargs = load_training_config(training_config)
@@ -68,7 +69,7 @@ def run(real_data_config: str,
     # log a warning if the train set is empty
     if len(train_set) == 0:
         LOGGER.warning("Training set is empty. No real samples to train on.")
-        
+
     if len(val_set) == 0 or len(test_set) == 0:
         raise ValueError(
             f"Each split must contain at least one item, but got "
@@ -77,10 +78,9 @@ def run(real_data_config: str,
 
     # Select synthetic samples for training
     n_real = len(train_set)
-    n_synth_needed = int(n_real * ratio)
+    n_synth_needed = int((n_real + 0.0001) * ratio)
     if len(synth_dataset) >= n_synth_needed:
         # Sample without replacement
-        import random
         random.seed(seed)
         synth_indices = random.sample(range(len(synth_dataset)), n_synth_needed)
         synth_train_set = [synth_dataset[i] for i in synth_indices]
