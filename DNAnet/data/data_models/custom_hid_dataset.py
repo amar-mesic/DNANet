@@ -42,13 +42,6 @@ class CustomHIDDataset(InMemoryDataset):
         self.sample_files = self.categorized_files["sample"]
 
         LOGGER.info(f"Found {len(self.sample_files)} files in {self.root_path}")
-        if limit is not None:
-            self.sample_files = self.sample_files[:limit]
-            LOGGER.info(f"Limiting dataset to {self.limit}")
-        # print the number of files found
-        LOGGER.info(f"Number of files limited to: {len(self.sample_files)}")
-        
-
         unvalidated_images = [
             HIDImage(path=f, panel=self.panel, size_standard=self.size_standard)
             for f in self.sample_files
@@ -60,6 +53,11 @@ class CustomHIDDataset(InMemoryDataset):
         ]
         LOGGER.info(f"Number of valid images: {len(validated_images)}")
         
+        # Move limiting logic here, after validation
+        if limit is not None:
+            validated_images = validated_images[:limit]
+            LOGGER.info(f"Limiting dataset to {self.limit}")
+        LOGGER.info(f"Number of files limited to: {len(validated_images)}")
         self._data = validated_images
 
         if self.adjustment_of_annotations:
