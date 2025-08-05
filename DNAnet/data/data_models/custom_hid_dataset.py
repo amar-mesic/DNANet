@@ -1,6 +1,7 @@
 import logging
-from typing import List, Optional, Union
-from DNAnet.data.data_models.base import InMemoryDataset
+from pathlib import Path
+from typing import List, Optional, Set, Tuple
+from DNAnet.data.data_models.base import InMemoryDataset, SimpleDataset
 from DNAnet.data.data_models.dna_models import Panel
 from DNAnet.data.data_models.hid_image import HIDImage
 from DNAnet.data.kit_compatibility.lane_standards import InternalSizeStandard
@@ -29,6 +30,7 @@ class CustomHIDDataset(InMemoryDataset):
         self.root_path = root_path
         self.files = find_files_by_suffix(root_path, ".hid")
 
+        self.panel_path = Path(panel_path)
         self.panel = Panel(panel_path)
 
         self.limit = limit
@@ -66,6 +68,64 @@ class CustomHIDDataset(InMemoryDataset):
                 for im in self._data
             ]
 
+
+
+
+
+
+
+
+    def split_by_genotypes(self, genotypes: Set[int]) -> Tuple['SimpleDataset', 'SimpleDataset']:
+        """
+        Splits a set of genotypes into two datasets: one with images whose contributors are a subset of genotypes,
+        and one with images whose contributors are disjoint from genotypes. Ambiguous images are discarded.
+
+        :param genotypes: A set of genotype IDs to split the dataset by. e.g.: {39, 40, 41, 42, 43}
+        :return: A tuple of two CustomHIDDataset instances.
+        """
+        community_A_images: List[HIDImage] = []
+        community_B_images: List[HIDImage] = []
+        ambiguous_images: List[HIDImage] = []
+
+        for img in self._data:
+            contribs = set(self.file_categorization_strategy.extract_contributor_ids(img.path.name))
+            if contribs.issubset(genotypes):
+                community_A_images.append(img)
+            elif contribs.isdisjoint(genotypes):
+                community_B_images.append(img)
+            else:
+                ambiguous_images.append(img)  # contributors from both groups, discard or flag
+
+        LOGGER.info(f"✅ Community A: {len(community_A_images)} images")
+        LOGGER.info(f"✅ Community B: {len(community_B_images)} images")
+        LOGGER.info(f"⚠️ Ambiguous: {len(ambiguous_images)} images discarded due to overlap")
+
+        # community_A_dataset = CustomHIDDataset(
+        #     files=[img.path for img in community_A_images],
+        #     panel_path=self.panel_path,
+        #     shuffle=self.shuffle,
+        #     limit=None,
+        #     adjustment_of_annotations=self.adjustment_of_annotations,
+        #     size_standard=self.size_standard,
+        #     file_categorization_strategy=self.file_categorization_strategy,
+        #     sample_validation_strategy=self.sample_validation_strategy
+        # )
+
+        # community_B_dataset = CustomHIDDataset(
+        #     files=[img.path for img in community_B_images],
+        #     panel_path=self.panel_path,
+        #     shuffle=self.shuffle,
+        #     limit=None,
+        #     adjustment_of_annotations=self.adjustment_of_annotations,
+        #     size_standard=self.size_standard,
+        #     file_categorization_strategy=self.file_categorization_strategy,
+        #     sample_validation_strategy=self.sample_validation_strategy
+        # )
+
+        community_A_dataset = SimpleDataset(data=community_A_images, shuffle=self.shuffle)
+        community_B_dataset = SimpleDataset(data=community_B_images, shuffle=self.shuffle)
+
+        return community_A_dataset, community_B_dataset
 
     def __str__(self):
         return (

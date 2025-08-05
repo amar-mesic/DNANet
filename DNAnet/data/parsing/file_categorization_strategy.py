@@ -9,6 +9,13 @@ FileCategory = Literal["sample", "ladder", "control", "unknown"]
 class FileCategorizationStrategy(Protocol):
     def __call__(self, file_name: str) -> FileCategory : ...
 
+    def extract_contributor_ids(self, file_name: str) -> list[int]:
+        """
+        Extracts contributor IDs from the file name.
+        Returns a list of integers (IDs), or an empty list if not found.
+        """
+        ...  # Default implementation can be provided if needed
+
 
 class NFIFileCategorizer(FileCategorizationStrategy):
     def __call__(self, file_name: str) -> FileCategory:
@@ -32,6 +39,7 @@ class NFIFileCategorizer(FileCategorizationStrategy):
             return "sample"
         # Unknown or unhandled
         return "unknown"
+
 
 class ProvedItFileCategorizer(FileCategorizationStrategy):
     def __call__(self, file_name: str) -> FileCategory:
@@ -71,11 +79,13 @@ class SyntheticFileCategorizer(FileCategorizationStrategy):
 
 from typing import List, Dict
 from collections import defaultdict
+from pathlib import Path
+
 
 def categorize_files(
     files: List, 
     strategy: FileCategorizationStrategy
-) -> Dict[FileCategory, List]:
+) -> Dict[FileCategory, List[Path]]:
     """
     Categorizes a list of files based on the provided categorization strategy.
     Args:

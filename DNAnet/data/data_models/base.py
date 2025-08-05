@@ -1,7 +1,7 @@
 import random
 from abc import ABC, abstractmethod
 from itertools import chain
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple
 
 import numpy as np
 
@@ -84,6 +84,8 @@ class InMemoryDataset(Sequence[Image]):
         dataset1 = SimpleDataset(data=shuffled_data[:split_idx], shuffle=self.shuffle)
         dataset2 = SimpleDataset(data=shuffled_data[split_idx:], shuffle=self.shuffle)
         return dataset1, dataset2
+    
+    def split_by_genotypes(self, genotypes: Set[int]) -> Tuple['InMemoryDataset', 'InMemoryDataset']: ...
 
     def split_k_fold(self, n_folds: int, seed: Optional[float] = None) -> \
             List[Tuple['SimpleDataset', 'SimpleDataset']]:

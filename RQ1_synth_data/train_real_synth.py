@@ -47,6 +47,9 @@ def run(real_data_config: str,
     add_file_handler_to_logger(LOGGER, path=log_path)
     LOGGER.info(f"Logs will be written to {log_path}")
 
+
+
+
     # Load the full config, not just dataset
     full_config = load_config(real_data_config, kind='data')
     split_cfg = full_config.get('split', {'train': 0.8, 'val': 0.1, 'test': 0.1})
@@ -59,12 +62,24 @@ def run(real_data_config: str,
     train_ratio = split_cfg['train']
     val_ratio = split_cfg['val']
     test_ratio = split_cfg['test']
-    total = train_ratio + val_ratio + test_ratio
+
+    total = 0 if isinstance(train_ratio, (list, set)) else train_ratio
+    total += val_ratio + test_ratio
     if not abs(total - 1.0) < 1e-6:
         raise ValueError(f"Split proportions must sum to 1.0, but got {total}.")
 
-    train_set, val_test_set = real_dataset.split(train_ratio, seed)
+    # Branch based on type of train_ratio
+    if isinstance(train_ratio, (list, set)):
+        # Genotype-based split
+        train_genotypes = set(train_ratio)
+        train_set, val_test_set = real_dataset.split_by_genotypes(train_genotypes)
+    else:
+        # Ratio-based split
+        train_set, val_test_set = real_dataset.split(train_ratio, seed)
+
     val_set, test_set = val_test_set.split(val_ratio / (val_ratio + test_ratio), seed)
+
+
 
     # log a warning if the train set is empty
     if len(train_set) == 0:
@@ -75,6 +90,8 @@ def run(real_data_config: str,
             f"Each split must contain at least one item, but got "
             f"train: {len(train_set)}, val: {len(val_set)}, test: {len(test_set)}"
         )
+
+
 
     # Select synthetic samples for training
     n_real = len(train_set)
@@ -98,6 +115,9 @@ def run(real_data_config: str,
     LOGGER.info(f"Training set: {len(train_set)} real + {len(synth_train_set)} synthetic (ratio used: {actual_ratio})")
     LOGGER.info(f"Validation set: {len(val_set)} real only")
     LOGGER.info(f"Test set: {len(test_set)} real only")
+
+
+
 
     # pick the model architecture, and load in pretrained checkpoint weights if available
     model = load_model(model_config)

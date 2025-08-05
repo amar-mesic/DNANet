@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 from typing import Optional
 
+import confidence
 import neptune
 from confidence import loadf, dumpf, Configuration
 from torch import seed
@@ -49,7 +50,6 @@ def run(data_config: str,
     LOGGER.info(f"Logs will be written to {log_path}")
 
 
-
     
 
     # Load the full config, not just dataset
@@ -58,33 +58,29 @@ def run(data_config: str,
 
     dataset = load_dataset(data_config)
 
-
-
-    # pick the model architecture, and load in pretrained checkpoint weights if available
-    model = load_model(model_config)
-
-    if checkpoint_dir:
-        model.load(checkpoint_dir)
-        LOGGER.info(f"Loading previous model checkpoint from {checkpoint_dir}")
-    else:
-        LOGGER.info("Will start training from scratch")
-
-
-
-
-
-    # Use split ratios
+    # Split real dataset only
     train_ratio = split_cfg['train']
     val_ratio = split_cfg['val']
     test_ratio = split_cfg['test']
 
-    # Check that proportions add up to 1 (allowing for small floating point error)
-    total = train_ratio + val_ratio + test_ratio
+    train_split_is_seq = isinstance(train_ratio, confidence.models.ConfigurationSequence) # type: ignore
+    total = 0 if train_split_is_seq else train_ratio
+    total += val_ratio + test_ratio
     if not abs(total - 1.0) < 1e-6:
         raise ValueError(f"Split proportions must sum to 1.0, but got {total}.")
 
-    train_set, val_test_set = dataset.split(train_ratio, seed)
+    # Branch based on type of train_ratio
+    if train_split_is_seq:
+        # Genotype-based split
+        train_genotypes = set(train_ratio)
+        train_set, val_test_set = dataset.split_by_genotypes(train_genotypes)
+    else:
+        # Ratio-based split
+        train_set, val_test_set = dataset.split(train_ratio, seed)
+
     val_set, test_set = val_test_set.split(val_ratio / (val_ratio + test_ratio), seed)
+
+
 
     # Check that all splits contain at least one item
     if len(train_set) == 0 or len(val_set) == 0 or len(test_set) == 0:
@@ -92,7 +88,18 @@ def run(data_config: str,
             f"Each split must contain at least one item, but got "
             f"train: {len(train_set)}, val: {len(val_set)}, test: {len(test_set)}"
         )
+    
 
+
+
+
+    # pick the model architecture, and load in pretrained checkpoint weights if available
+    model = load_model(model_config)
+    if checkpoint_dir:
+        model.load(checkpoint_dir)
+        LOGGER.info(f"Loading previous model checkpoint from {checkpoint_dir}")
+    else:
+        LOGGER.info("Will start training from scratch")
 
 
     # Ensure the model has a .fit() method
