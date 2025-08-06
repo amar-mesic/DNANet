@@ -1,5 +1,5 @@
 training:
-  experiment_name: test #最好U网-0真:256假均匀高斯-不早停-lr0.001-用cyc调度0.3-第1
+  experiment_name: test-synth-on-synth #最好U网-0真:256假均匀高斯-不早停-lr0.001-用cyc调度0.3-第1
   checkpoint_dir: "checkpoints/"
   log_neptune: true
   batch_size: 32

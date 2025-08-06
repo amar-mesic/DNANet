@@ -59,6 +59,9 @@ class DNANet_UNet(TrainableModel):
         :param apply_allele_caller: Whether to call actual alleles from the predicted segmentation
         """
         self._device = device or TORCH_DEFAULT_DEVICE
+        # log which device is being used
+        LOGGER.info(f"Using device: {self._device}")
+        
         model = UNet(depth, kernel_size, num_filters, self._device)
         self._model = model.to(self._device)
         self.loss_fn = DiceLoss()

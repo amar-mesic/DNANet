@@ -100,28 +100,6 @@ class CustomHIDDataset(InMemoryDataset):
         LOGGER.info(f"✅ Community B: {len(community_B_images)} images")
         LOGGER.info(f"⚠️ Ambiguous: {len(ambiguous_images)} images discarded due to overlap")
 
-        # community_A_dataset = CustomHIDDataset(
-        #     files=[img.path for img in community_A_images],
-        #     panel_path=self.panel_path,
-        #     shuffle=self.shuffle,
-        #     limit=None,
-        #     adjustment_of_annotations=self.adjustment_of_annotations,
-        #     size_standard=self.size_standard,
-        #     file_categorization_strategy=self.file_categorization_strategy,
-        #     sample_validation_strategy=self.sample_validation_strategy
-        # )
-
-        # community_B_dataset = CustomHIDDataset(
-        #     files=[img.path for img in community_B_images],
-        #     panel_path=self.panel_path,
-        #     shuffle=self.shuffle,
-        #     limit=None,
-        #     adjustment_of_annotations=self.adjustment_of_annotations,
-        #     size_standard=self.size_standard,
-        #     file_categorization_strategy=self.file_categorization_strategy,
-        #     sample_validation_strategy=self.sample_validation_strategy
-        # )
-
         community_A_dataset = SimpleDataset(data=community_A_images, shuffle=self.shuffle)
         community_B_dataset = SimpleDataset(data=community_B_images, shuffle=self.shuffle)
 

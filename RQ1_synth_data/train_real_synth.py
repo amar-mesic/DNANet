@@ -4,10 +4,14 @@ import os
 from datetime import datetime
 from typing import Optional
 
+import confidence
 import neptune
 from confidence import loadf, dumpf, Configuration
+import numpy as np
 from torch import seed
 import random
+
+import torch
 
 from DNAnet.evaluation.segmentation.allele_metrics import allele_f1_score, allele_precision, allele_recall
 from config_io import load_config, load_dataset, load_model, load_training_config
@@ -28,7 +32,16 @@ def run(real_data_config: str,
     
     training_kwargs = load_training_config(training_config)
     log_neptune = training_kwargs.get('log_neptune', False)
+
+        # Set random seeds for reproducibility
     seed = training_kwargs.get('seed', 42)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
     experiment_name = training_kwargs.get('experiment_name', "Prediction model")
 
     if log_neptune:
@@ -63,13 +76,14 @@ def run(real_data_config: str,
     val_ratio = split_cfg['val']
     test_ratio = split_cfg['test']
 
-    total = 0 if isinstance(train_ratio, (list, set)) else train_ratio
+    train_split_is_seq = isinstance(train_ratio, confidence.models.ConfigurationSequence)
+    total = 0 if train_split_is_seq else train_ratio
     total += val_ratio + test_ratio
     if not abs(total - 1.0) < 1e-6:
         raise ValueError(f"Split proportions must sum to 1.0, but got {total}.")
 
     # Branch based on type of train_ratio
-    if isinstance(train_ratio, (list, set)):
+    if train_split_is_seq:
         # Genotype-based split
         train_genotypes = set(train_ratio)
         train_set, val_test_set = real_dataset.split_by_genotypes(train_genotypes)

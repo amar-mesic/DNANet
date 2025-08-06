@@ -2,12 +2,15 @@ import json
 import logging
 import os
 from datetime import datetime
+import random
 from typing import Optional
 
 import confidence
 import neptune
 from confidence import loadf, dumpf, Configuration
+import numpy as np
 from torch import seed
+import torch
 
 from DNAnet.evaluation.segmentation.allele_metrics import allele_f1_score, allele_precision, allele_recall
 from config_io import load_config, load_dataset, load_model, load_training_config
@@ -27,7 +30,16 @@ def run(data_config: str,
     
     training_kwargs = load_training_config(training_config)
     log_neptune = training_kwargs.get('log_neptune', False)
+    
+    # Set random seeds for reproducibility
     seed = training_kwargs.get('seed', 42)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
     experiment_name = training_kwargs.get('experiment_name', "Prediction model")
 
     if log_neptune:
@@ -55,6 +67,8 @@ def run(data_config: str,
     # Load the full config, not just dataset
     full_config = load_config(data_config, kind='data')
     split_cfg = full_config.get('split', {'train': 0.8, 'val': 0.1, 'test': 0.1})
+    # log the split configuration
+    LOGGER.info(f"Split configuration: {split_cfg}")
 
     dataset = load_dataset(data_config)
 
