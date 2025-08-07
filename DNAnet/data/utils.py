@@ -142,7 +142,7 @@ def get_interpolated_basepairs(size_standard_dye_lane: np.ndarray, size_standard
     bps = get_size_standard_bps(size_standard)
     # only take the last n peaks excluding the final peak, validate by comparing their
     # relative distances to SIZE_STANDARD_BPS
-    relevant_peak_indices_from_lane_standard = size_standard_peaks_idxs[-len(bps)-1:-1]
+    relevant_peak_indices_from_lane_standard = size_standard_peaks_idxs[-len(bps):] # why remove last?
 
     # TODO: do not return none, but flag image as invalid
     if not validate_ss_peaks(relevant_peak_indices_from_lane_standard, expected_bps=bps):

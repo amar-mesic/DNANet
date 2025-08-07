@@ -120,7 +120,7 @@ def run(data_config: str,
     if not isinstance(model, TrainableModel):
         raise ValueError(f"Model {model} is not trainable.")
 
-    training_kwargs = load_training_config(training_config)
+    # Update training_kwargs with validation set and log parameters
     training_kwargs.update({'validation_set': val_set})
     run['parameters'] = training_kwargs
 

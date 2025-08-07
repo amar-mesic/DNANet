@@ -72,7 +72,8 @@ class ProvedItFileCategorizer(FileCategorizationStrategy):
     
 
 class SyntheticFileCategorizer(FileCategorizationStrategy):
-    def __call__(self, file_name: str) -> FileCategory: return "sample"
+    def __call__(self, file_name: str) -> FileCategory:
+        return "sample"
     
 
 

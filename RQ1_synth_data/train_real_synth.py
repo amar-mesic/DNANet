@@ -27,14 +27,13 @@ def run(real_data_config: str,
         synth_data_config: str,
         model_config: str,
         training_config: str,
-        ratio: float = 1,
         checkpoint_dir: Optional[str] = None):
     
     training_kwargs = load_training_config(training_config)
-    log_neptune = training_kwargs.get('log_neptune', False)
+    log_neptune = training_kwargs['log_neptune']
 
         # Set random seeds for reproducibility
-    seed = training_kwargs.get('seed', 42)
+    seed = training_kwargs['seed']
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -42,7 +41,7 @@ def run(real_data_config: str,
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    experiment_name = training_kwargs.get('experiment_name', "Prediction model")
+    experiment_name = training_kwargs['experiment_name']
 
     if log_neptune:
         run = neptune.init_run(
@@ -65,7 +64,7 @@ def run(real_data_config: str,
 
     # Load the full config, not just dataset
     full_config = load_config(real_data_config, kind='data')
-    split_cfg = full_config.get('split', {'train': 0.8, 'val': 0.1, 'test': 0.1})
+    split_cfg = full_config['split']
 
     # Load datasets
     real_dataset = load_dataset(real_data_config)
@@ -108,6 +107,7 @@ def run(real_data_config: str,
 
 
     # Select synthetic samples for training
+    ratio = training_kwargs['synth_ratio']
     n_real = len(train_set)
     n_synth_needed = int((n_real + 0.0001) * ratio)
     if len(synth_dataset) >= n_synth_needed:
@@ -145,7 +145,6 @@ def run(real_data_config: str,
     if not isinstance(model, TrainableModel):
         raise ValueError(f"Model {model} is not trainable.")
 
-    training_kwargs = load_training_config(training_config)
     training_kwargs.update({'validation_set': val_set})
     if log_neptune:
         run['parameters'] = training_kwargs
@@ -176,6 +175,7 @@ def run(real_data_config: str,
     complete_config = simple_dump_config(
         config_path,
         os.path.join("config", "data", real_data_config),
+        os.path.join("config", "data", synth_data_config),
         os.path.join("config", "models", model_config),
         os.path.join("config", "training", training_config)
     )
@@ -190,14 +190,15 @@ def run(real_data_config: str,
 
 def simple_dump_config(
     path: str,
-    data_config_path: str,
+    real_data_config_path: str,
+    synth_data_config_path: str,
     model_config_path: str,
     training_config_path: str
 ):
     config = {}
-    config['data'] = dict(loadf(data_config_path))
+    config['real_data'] = dict(loadf(real_data_config_path))
+    config['synth_data'] = dict(loadf(synth_data_config_path))
     config['model'] = dict(loadf(model_config_path))
-    if training_config_path:
-        config['training'] = dict(loadf(training_config_path))
+    config['training'] = dict(loadf(training_config_path))
     dumpf(Configuration(config), path)
     return config

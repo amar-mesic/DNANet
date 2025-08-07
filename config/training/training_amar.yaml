@@ -4,7 +4,6 @@ training:
   log_neptune: true
   batch_size: 32
   num_epochs: 200
-  steps_per_epoch:
   use_evaluation_metric: true
   save_best: true
   use_scheduler: true
@@ -16,5 +15,5 @@ training:
   min_delta: -1.0             # -1 -> no early stopping
   patience: 20
   weight_decay: 0.0001
-  tensorboard: false
   seed: 42
+  ratio: 1
