@@ -9,7 +9,14 @@ from DNAnet.data.data_models import Annotation, Panel
 from DNAnet.data.data_models.base import Image
 from DNAnet.data.data_models.hid_image import HIDImage
 from DNAnet.data.kit_compatibility.lane_standards import InternalSizeStandard
-from DNAnet.data.utils import find_peak_boundary, find_peak_idx_near_or_in_range, get_interpolated_basepairs, rescale_dye
+from DNAnet.data.utils import (
+    find_peak_boundary,
+    find_peak_idx_near_or_in_range,
+    get_interpolated_basepairs,
+    rescale_dye,
+    BASE_PAIR_START,
+    BASE_PAIR_END,
+)
 from DNAnet.data.parsing import parse_called_alleles
 from DNAnet.utils import load_donor_alleles, load_donor_alleles_provedit, load_donor_alleles_synthetic_data
 from DNAnet.typing import PathLike
@@ -80,15 +87,23 @@ class SyntheticImage(Image):
         interpolated_base_pairs = get_interpolated_basepairs(np.array(profile[-1]), self.size_standard)
         if interpolated_base_pairs is None:
             raise ValueError(f"Invalid size standard for file {self.path}")
+
+        rescaled_indices = rescale_dye(
+            interpolated_base_pairs,
+            self.size_standard,
+            target_range=(BASE_PAIR_START, BASE_PAIR_END),
+        )
+
         # Scale the profile using the size standard
-        data = self._rescale_profile(profile,
-                                     interpolated_base_pairs,
-                                     self.size_standard,
-                                     self.include_size_standard)
-        
+        data = self._rescale_profile(
+            profile,
+            rescaled_indices,
+            self.include_size_standard,
+        )
+
         # Create a scaler, which is used to map a pixel index in the profile to a base pair
         # location, i.e. the first pixel is in fact BASE_PAIR_START, the last pixel is BASE_PAIR_END
-        self._scaler = interpolated_base_pairs[rescale_dye(interpolated_base_pairs, self.size_standard)]
+        self._scaler = interpolated_base_pairs[rescaled_indices]
 
         # called_alleles = None
         # # Determine the called alleles from the annotations file 
@@ -119,12 +134,13 @@ class SyntheticImage(Image):
 
 
     @staticmethod
-    def _rescale_profile(profile: np.ndarray,
-                         interpolated_base_pairs: np.ndarray,
-                         size_standard: str,
-                         include_standard: bool) -> np.ndarray:
+    def _rescale_profile(
+        profile: np.ndarray,
+        rescale_indices: np.ndarray,
+        include_standard: bool,
+    ) -> np.ndarray:
         selected_profile = profile if include_standard else profile[:-1]
-        data = selected_profile[:, rescale_dye(interpolated_base_pairs, size_standard)]
+        data = selected_profile[:, rescale_indices]
         return data[..., np.newaxis]
     
     

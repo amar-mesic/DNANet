@@ -20,6 +20,8 @@ from DNAnet.data.utils import (
     find_peak_idx_near_or_in_range,
     get_interpolated_basepairs,
     rescale_dye,
+    BASE_PAIR_START,
+    BASE_PAIR_END,
 )
 from DNAnet.typing import PathLike
 from DNAnet.utils import load_donor_alleles_provedit, load_donor_alleles
@@ -107,21 +109,28 @@ class HIDImage(Image):
             return None
         # Use the size standard to translate the location in the profile (array) to base pairs
         interpolated_base_pairs = get_interpolated_basepairs(np.array(profile[-1]), self.size_standard)
-        # using none checks is defnitely not the best way to validate the size standard,
         if interpolated_base_pairs is None:
             # If the size standard does not pass validation, interpolated_base_pairs
             # becomes None and the image will be skipped when creating a dataset
             return None
-        
+
+        # Determine indices that map the profile to a common base pair range
+        rescaled_indices = rescale_dye(
+            interpolated_base_pairs,
+            self.size_standard,
+            target_range=(BASE_PAIR_START, BASE_PAIR_END),
+        )
+
         # Scale the profile using the size standard
-        data = self._rescale_profile(profile,
-                                     interpolated_base_pairs,
-                                     self.size_standard,
-                                     self.include_size_standard)
-        
+        data = self._rescale_profile(
+            profile,
+            rescaled_indices,
+            self.include_size_standard,
+        )
+
         # Create a scaler, which is used to map a pixel index in the profile to a base pair
         # location, i.e. the first pixel is in fact BASE_PAIR_START, the last pixel is BASE_PAIR_END
-        self._scaler = interpolated_base_pairs[rescale_dye(interpolated_base_pairs, self.size_standard)]
+        self._scaler = interpolated_base_pairs[rescaled_indices]
 
         called_alleles = None
         # Determine the called alleles from the annotations file 
@@ -194,22 +203,23 @@ class HIDImage(Image):
         return self._scaler[np.newaxis, :]
 
     @staticmethod
-    def _rescale_profile(profile: np.ndarray,
-                         interpolated_base_pairs: np.ndarray,
-                         size_standard: str,
-                         include_standard: bool) -> np.ndarray:
-        """
-        Rescale profile based on interpolated base pairs.
+    def _rescale_profile(
+        profile: np.ndarray,
+        rescale_indices: np.ndarray,
+        include_standard: bool,
+    ) -> np.ndarray:
+        """Rescale profile based on precomputed rescale indices.
 
         :param profile: array of dyes in chronological order
-        :param interpolated_base_pairs: the interpolated base pairs
-        :param include_standard: if the size standard should be included
-            in the final profile/data
+        :param rescale_indices: indices of the original profile corresponding to
+            each pixel in the rescaled profile
+        :param include_standard: if the size standard should be included in the
+            final profile/data
         :return: parsed profile as array
         """
         # Select profile based on include_standard flag
         selected_profile = profile if include_standard else profile[:-1]
-        data = selected_profile[:, rescale_dye(interpolated_base_pairs, size_standard)]
+        data = selected_profile[:, rescale_indices]
         return data[..., np.newaxis]
 
     def _get_segmentation(self,

@@ -10,6 +10,8 @@ from DNAnet.data.utils import (
     find_peak_idx_near_or_in_range,
     find_peak_near_idx,
     find_peaks_above_threshold,
+    validate_ss_peaks,
+    rescale_dye,
 )
 
 
@@ -108,3 +110,21 @@ def test_interpolate_basepairs_float():
     # Extrapolation
     interp = basepair_interpolator(indices, original_x_values, extrapolate=True)
     assert_array_equal(interp(93.47), np.array([93.29]))
+
+
+def test_validate_ss_peaks_quadratic():
+    bps = np.array([60, 80, 100, 120, 140])
+    peaks = 10 * bps + 0.05 * (bps - 60) ** 2
+    assert validate_ss_peaks(peaks, bps)
+    bad_peaks = peaks.copy()
+    bad_peaks[-1] += 500
+    assert not validate_ss_peaks(bad_peaks, bps)
+
+
+def test_rescale_dye_target_range():
+    basepairs = np.linspace(50, 500, 10000)
+    idx = rescale_dye(basepairs, "WEN_ILS", rescale_size=5, target_range=(60, 480))
+    scaled = basepairs[idx]
+    assert scaled[0] == pytest.approx(60, abs=1)
+    assert scaled[-1] == pytest.approx(480, abs=1)
+    assert len(idx) == 5
