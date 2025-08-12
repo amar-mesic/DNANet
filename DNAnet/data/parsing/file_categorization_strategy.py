@@ -1,6 +1,9 @@
 from typing import Protocol
 import re
 from typing import Literal
+from typing import List, Dict
+from collections import defaultdict
+from pathlib import Path
 
 
 FileCategory = Literal["sample", "ladder", "control", "unknown"]
@@ -74,13 +77,11 @@ class ProvedItFileCategorizer(FileCategorizationStrategy):
 class SyntheticFileCategorizer(FileCategorizationStrategy):
     def __call__(self, file_name: str) -> FileCategory:
         return "sample"
+
+    def extract_contributor_ids(self, file_name: str) -> List[int]:
+        raise NotImplementedError
+
     
-
-
-
-from typing import List, Dict
-from collections import defaultdict
-from pathlib import Path
 
 
 def categorize_files(

@@ -1,3 +1,4 @@
+import logging
 import random
 from abc import ABC, abstractmethod
 from itertools import chain
@@ -8,6 +9,7 @@ import numpy as np
 from DNAnet.data.data_models import Annotation
 from DNAnet.data.split import split_data_in_k_folds
 
+LOGGER = logging.getLogger("dnanet")
 
 class Image(ABC):
     """
@@ -21,6 +23,29 @@ class Image(ABC):
         The raw data content of the image.
         """
         raise NotImplementedError
+    
+    
+
+    @staticmethod
+    def _rescale_profile(
+        profile: np.ndarray,
+        rescale_indices: np.ndarray,
+        include_standard: bool,
+    ) -> np.ndarray:
+        """Rescale profile based on precomputed rescale indices.
+
+        :param profile: array of dyes in chronological order
+        :param rescale_indices: indices of the original profile corresponding to
+            each pixel in the rescaled profile
+        :param include_standard: if the size standard should be included in the
+            final profile/data
+        :return: parsed profile as array
+        """
+        # Select profile based on include_standard flag
+        selected_profile = profile if include_standard else profile[:-1]
+        data = selected_profile[:, rescale_indices]
+        return data[..., np.newaxis]
+    
 
     @property
     @abstractmethod

@@ -65,6 +65,47 @@ def process_image(
     return data
 
 
+
+
+
+def get_interpolated_basepairs(size_standard_dye_lane: np.ndarray, size_standard: str) -> (
+        Optional)[np.ndarray]:
+    """
+    Takes the array of the size standard and detects the 19 peaks corresponding
+    with the provided list of base pairs. Put these base pairs on their position
+    in an array and interpolates all values in between.
+
+    :param size_standard_dye: the values of the intenral size standard dye for this image/EPG
+    :return: interpolated base pairs
+    """
+    # find the peaks in the size standard array
+    # TODO: Detect if peaks are primer flares and remove them. This would be in previous step.
+    size_standard_peaks_idxs = extract_ss_peaks(size_standard_dye_lane)
+
+    bps = get_size_standard_bps(size_standard)
+    # only take the last n peaks excluding the final peak, validate by comparing their
+    # relative distances to SIZE_STANDARD_BPS
+    relevant_peak_indices_from_lane_standard = size_standard_peaks_idxs[-len(bps):]
+
+    # TODO: do not return none, but flag image as invalid
+    if not validate_ss_peaks(relevant_peak_indices_from_lane_standard, expected_bps=bps):
+        return None
+
+    # returns an interpolator function that maps the indices of the size standard peaks (i.e. scan points) to the base pairs
+    interpolator = basepair_interpolator(indices=relevant_peak_indices_from_lane_standard,
+                                   original_x_values=bps)
+    
+    # interpolate these to the complete array (all values for indices outside
+    # the size_standard_peaks_idxs range will be 0)
+    # apply the interpolator function
+    basepairs_interpolated = interpolator(np.arange(len(size_standard_dye_lane)))
+
+    return basepairs_interpolated
+
+
+
+
+
 def validate_ss_peaks(
     peaks: np.ndarray,
     expected_bps: np.ndarray,
@@ -125,39 +166,6 @@ def validate_ss_peaks(
 
 
 
-def get_interpolated_basepairs(size_standard_dye_lane: np.ndarray, size_standard: str) -> (
-        Optional)[np.ndarray]:
-    """
-    Takes the array of the size standard and detects the 19 peaks corresponding
-    with the provided list of base pairs. Put these base pairs on their position
-    in an array and interpolates all values in between.
-
-    :param size_standard_dye: the values of the intenral size standard dye for this image/EPG
-    :return: interpolated base pairs
-    """
-    # find the peaks in the size standard array
-    # TODO: Detect if peaks are primer flares and remove them. This would be in previous step.
-    size_standard_peaks_idxs = extract_ss_peaks(size_standard_dye_lane)
-
-    bps = get_size_standard_bps(size_standard)
-    # only take the last n peaks excluding the final peak, validate by comparing their
-    # relative distances to SIZE_STANDARD_BPS
-    relevant_peak_indices_from_lane_standard = size_standard_peaks_idxs[-len(bps):] # why remove last?
-
-    # TODO: do not return none, but flag image as invalid
-    if not validate_ss_peaks(relevant_peak_indices_from_lane_standard, expected_bps=bps):
-        return None
-
-    # returns an interpolator function that maps the indices of the size standard peaks (i.e. scan points) to the base pairs
-    interpolator = basepair_interpolator(indices=relevant_peak_indices_from_lane_standard,
-                                   original_x_values=bps)
-    
-    # interpolate these to the complete array (all values for indices outside
-    # the size_standard_peaks_idxs range will be 0)
-    # apply the interpolator function
-    basepairs_interpolated = interpolator(np.arange(len(size_standard_dye_lane)))
-
-    return basepairs_interpolated
 
 
 def find_peaks_above_threshold(array: np.ndarray, threshold: int) -> \
@@ -246,13 +254,13 @@ def extract_ss_peaks(array: np.ndarray) -> np.ndarray:
     [500, 520, 520, 510]) or a peak within a close distance of another
     peak, therefore we filter the found indices based on distance.
     """
-    peak_idxs = find_peaks_above_threshold(array, 180)
+    peak_idxs = find_peaks_above_threshold(array, 300)
     # the final two peaks in the size standard are often lower than the other peaks, therefore we
     # try to find those in the end of the array with a lower threshold if we haven't found them yet
-    split_idx = 8200  # TODO: can we find this dynamically or something?
-    if len(peak_idxs) > 0 and peak_idxs[-1] <= split_idx:
-        final_peak_idxs = find_peaks_above_threshold(array[split_idx:], 120) + split_idx
-        peak_idxs = np.union1d(peak_idxs, final_peak_idxs)
+    # split_idx = 8200  # TODO: can we find this dynamically or something?
+    # if len(peak_idxs) > 0 and peak_idxs[-1] <= split_idx:
+    #     final_peak_idxs = find_peaks_above_threshold(array[split_idx:], 120) + split_idx
+    #     peak_idxs = np.union1d(peak_idxs, final_peak_idxs)
     # look for peak that are close (within 15 pixels) and delete the peak on the first index. This
     # may go wrong when we have a situation like [1000, 1001, 800, 800, 799], then we
     # ideally want to keep the highest peak (1001), but now this one gets deleted and we keep 1000.
@@ -281,17 +289,20 @@ def basepair_interpolator(indices: np.ndarray,
     return interp
 
 
-def rescale_dye(basepairs: np.ndarray, size_standard: str, rescale_size: int = 4096) -> np.ndarray:
+
+def rescale_dye(
+    basepairs: np.ndarray,
+    rescale_size: int,
+    target_range: Tuple[int, int]
+) -> np.ndarray:
+    """Map base-pair positions to scaled pixel indices.
+
+    ``basepairs`` is an array containing the interpolated base-pair value for
+    each scan point of the electropherogram. ``target_range`` defines the base
+    pair range of the rescaled profile (defaults to the size standard range when
+    ``None``).
     """
-    Rescale the interpolated base pairs of the size standard so that they fit between
-    BASE_PAIR_START and BASE_PAIR_END, on exactly RESCALE_SIZE pixels. The output array
-    should function as a translator that indicates which pixel indices (of an unscaled dye) should
-    be on every pixel location.
-    E.g. if the output is np.array([3825, 3826, ..]), then a pixel on index 3825 should be
-    scaled to the first pixel, and a pixel on index 3826 should be scaled to the second pixel.
-    """
-    bps = get_size_standard_bps(size_standard)
-    bp_start, bp_end = bps[0], bps[-1]
+    bp_start, bp_end = target_range
     target_linspace = np.linspace(bp_start, bp_end, rescale_size)
 
     # Presorting interpolated base pairs

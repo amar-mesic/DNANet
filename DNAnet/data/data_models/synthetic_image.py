@@ -8,10 +8,9 @@ import referencing
 from DNAnet.data.data_models import Annotation, Panel
 from DNAnet.data.data_models.base import Image
 from DNAnet.data.data_models.hid_image import HIDImage
-from DNAnet.data.kit_compatibility.lane_standards import InternalSizeStandard
-from DNAnet.data.utils import find_peak_boundary, find_peak_idx_near_or_in_range, get_interpolated_basepairs, rescale_dye
-from DNAnet.data.parsing import parse_called_alleles
-from DNAnet.utils import load_donor_alleles, load_donor_alleles_provedit, load_donor_alleles_synthetic_data
+from DNAnet.data.kit_compatibility.lane_standards import BASE_PAIR_END, BASE_PAIR_START, RESCALE_SIZE, VAL_THRESHOLD, InternalSizeStandard, get_size_standard_bps
+from DNAnet.data.utils import basepair_interpolator, extract_ss_peaks, find_peak_boundary, find_peak_idx_near_or_in_range, rescale_dye
+from DNAnet.utils import load_donor_alleles_synthetic_data
 from DNAnet.typing import PathLike
 
 LOGGER = logging.getLogger("dnanet")
@@ -54,59 +53,62 @@ class SyntheticImage(Image):
             return self._data
         return self._read()
 
-    def _read(self) -> np.ndarray:
+    def _read(self) -> Optional[np.ndarray]:
         if not self.path.exists():
             raise FileNotFoundError(str(self.path))
-        profile = np.load(self.path)
+        self.profile = profile = np.load(self.path)
         # Squeeze last dimension if present (e.g., (6, N, 1) -> (6, N))
         if profile.ndim == 3 and profile.shape[-1] == 1:
             profile = np.squeeze(profile, axis=-1)
-
-        # Pad the profile to shape (6, 9641) along axis=1 (scan points)
-        target_scan_points = 9641
-        current_scan_points = profile.shape[1]
-        if current_scan_points == 5000:
-            # The 5000 scan points are from indices 4000:9000 of the original
-            pad_left = 4000
-            pad_right = target_scan_points - (pad_left + current_scan_points)
-            profile = np.pad(profile, ((0, 0), (pad_left, pad_right)), mode='constant')
-        elif current_scan_points < target_scan_points:
-            # Unexpected case: pad all at the end
-            pad_right = target_scan_points - current_scan_points
-            profile = np.pad(profile, ((0, 0), (0, pad_right)), mode='constant')
-        elif current_scan_points > target_scan_points:
-            raise ValueError(f"Profile scan points ({current_scan_points}) exceed expected ({target_scan_points})")
-
-        interpolated_base_pairs = get_interpolated_basepairs(np.array(profile[-1]), self.size_standard)
-        if interpolated_base_pairs is None:
-            raise ValueError(f"Invalid size standard for file {self.path}")
-        # Scale the profile using the size standard
-        data = self._rescale_profile(profile,
-                                     interpolated_base_pairs,
-                                     self.size_standard,
-                                     self.include_size_standard)
         
-        # Create a scaler, which is used to map a pixel index in the profile to a base pair
-        # location, i.e. the first pixel is in fact BASE_PAIR_START, the last pixel is BASE_PAIR_END
-        self._scaler = interpolated_base_pairs[rescale_dye(interpolated_base_pairs, self.size_standard)]
 
-        # called_alleles = None
-        # # Determine the called alleles from the annotations file 
-        # if self.annotations_file and self._panel and \
-        #         (annotations_name := self.meta.get('annotations_name')):
-        #     called_alleles = parse_called_alleles(self.annotations_file,
-        #                                           self._panel,
-        #                                           annotations_name)
+        size_standard_dye_lane = np.array(profile[-1])
+        size_standard_peaks_idxs = extract_ss_peaks(size_standard_dye_lane)
+        self.bps = bps = get_size_standard_bps(self.size_standard)
 
-        # if called_alleles and self.annotation is None:
-        #     # Parse the called alleles into a segmentation
-        #     segmentation = self._get_segmentation(called_alleles, data.shape)
-        #     self._annotation = Annotation(image=segmentation) # where the annotation is ASSIGNED
-        #     self._meta['called_alleles'] = called_alleles
+        diff = VAL_THRESHOLD + 1
+        shrinkages = 0
+        while shrinkages < 10:
+            self.size_standard_peaks_idxs = size_standard_peaks_idxs = size_standard_peaks_idxs[-len(bps):]
 
-        # But what if there is no annotations file, only genotype info?
-        # This is ofc hardcoded for the ProvedIt dataset for now
-        # if self.annotation is None and self._panel:
+            coeffs = np.polyfit(size_standard_peaks_idxs, bps, 2)
+            fitted = np.polyval(coeffs, size_standard_peaks_idxs)
+
+            diff = np.max(np.abs(fitted - bps))
+            if diff < VAL_THRESHOLD:
+                break
+            else:
+                self.bps = bps = bps[:-1]  # remove the last base pair and try again
+                shrinkages += 1
+                
+        # if shrinkages > 0:
+        #     LOGGER.info(f"Size standard for {self.path.name} was shrunk {shrinkages} times to fit the profile. "
+        #                    f"Max difference: {diff:.2f} bp.")
+        if diff >= VAL_THRESHOLD:
+                LOGGER.warning(f"Size standard for {self.path.name} differs {diff} from the expected ")
+                return None
+
+        # returns an interpolator function that maps the indices of the size standard peaks (i.e. scan points) to the base pairs
+        interpolator = basepair_interpolator(indices=size_standard_peaks_idxs,
+                                   original_x_values=bps, extrapolate=False)
+        self.interpolated_base_pairs = interpolator(np.arange(len(size_standard_dye_lane)))
+
+        rescaled_indices = rescale_dye(
+            self.interpolated_base_pairs,
+            rescale_size=RESCALE_SIZE,
+            target_range=(BASE_PAIR_START, BASE_PAIR_END),
+        )
+
+        data = self._rescale_profile(
+            profile,
+            rescaled_indices,
+            self.include_size_standard,
+        )
+
+        self._scaler = self.interpolated_base_pairs[rescaled_indices]
+
+        
+
         try:
             true_alleles = load_donor_alleles_synthetic_data(str(self.path), self._panel, self.reference_genotype_path, self.epg_to_genotypes_mapping_path)
             segmentation = self._get_segmentation(true_alleles, data.shape)
@@ -116,16 +118,6 @@ class SyntheticImage(Image):
             LOGGER.warning(f"Could not load true alleles for {self.path}: {e}")
         return data
     
-
-
-    @staticmethod
-    def _rescale_profile(profile: np.ndarray,
-                         interpolated_base_pairs: np.ndarray,
-                         size_standard: str,
-                         include_standard: bool) -> np.ndarray:
-        selected_profile = profile if include_standard else profile[:-1]
-        data = selected_profile[:, rescale_dye(interpolated_base_pairs, size_standard)]
-        return data[..., np.newaxis]
     
     
 

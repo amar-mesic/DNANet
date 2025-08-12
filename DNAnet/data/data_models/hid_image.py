@@ -11,14 +11,14 @@ from scipy.signal import find_peaks
 
 from DNAnet.data.data_models import Allele, Annotation, Marker, Panel
 from DNAnet.data.data_models.base import Image
-from DNAnet.data.kit_compatibility.lane_standards import InternalSizeStandard
+from DNAnet.data.kit_compatibility.lane_standards import BASE_PAIR_END, BASE_PAIR_START, RESCALE_SIZE, VAL_THRESHOLD, InternalSizeStandard, get_size_standard_bps
 from DNAnet.data.parsing import get_peak_data, parse_called_alleles
 from DNAnet.data.utils import (
     assert_image_data_valid_format,
     basepair_interpolator,
+    extract_ss_peaks,
     find_peak_boundary,
     find_peak_idx_near_or_in_range,
-    get_interpolated_basepairs,
     rescale_dye,
 )
 from DNAnet.typing import PathLike
@@ -103,25 +103,57 @@ class HIDImage(Image):
             raise FileNotFoundError(str(self.path))
 
         # Parse the raw hid image into a numpy array.
-        if (profile := get_peak_data(self.path)) is None:
-            return None
-        # Use the size standard to translate the location in the profile (array) to base pairs
-        interpolated_base_pairs = get_interpolated_basepairs(np.array(profile[-1]), self.size_standard)
-        # using none checks is defnitely not the best way to validate the size standard,
-        if interpolated_base_pairs is None:
-            # If the size standard does not pass validation, interpolated_base_pairs
-            # becomes None and the image will be skipped when creating a dataset
+        self.profile = profile = get_peak_data(self.path)
+        if profile is None:
             return None
         
-        # Scale the profile using the size standard
-        data = self._rescale_profile(profile,
-                                     interpolated_base_pairs,
-                                     self.size_standard,
-                                     self.include_size_standard)
+
+        size_standard_dye_lane = np.array(profile[-1])
+        size_standard_peaks_idxs = extract_ss_peaks(size_standard_dye_lane)
+        self.bps = bps = get_size_standard_bps(self.size_standard)
+
+        diff = VAL_THRESHOLD + 1
+        shrinkages = 0
+        while shrinkages < 10:
+            self.size_standard_peaks_idxs = size_standard_peaks_idxs = size_standard_peaks_idxs[-len(bps):]
+
+            coeffs = np.polyfit(size_standard_peaks_idxs, bps, 2)
+            fitted = np.polyval(coeffs, size_standard_peaks_idxs)
+
+            diff = np.max(np.abs(fitted - bps))
+            if diff < VAL_THRESHOLD:
+                break
+            else:
+                self.bps = bps = bps[:-1]  # remove the last base pair and try again
+                shrinkages += 1
+                
+        # if shrinkages > 0:
+        #     LOGGER.info(f"Size standard for {self.path.name} was shrunk {shrinkages} times to fit the profile. "
+        #                    f"Max difference: {diff:.2f} bp.")
+        if diff >= VAL_THRESHOLD:
+                LOGGER.warning(f"Size standard for {self.path.name} differs {diff} from the expected ")
+                return None
+
+        # returns an interpolator function that maps the indices of the size standard peaks (i.e. scan points) to the base pairs
+        interpolator = basepair_interpolator(indices=size_standard_peaks_idxs,
+                                   original_x_values=bps, extrapolate=False)
+        self.interpolated_base_pairs = interpolator(np.arange(len(size_standard_dye_lane)))
+
+        rescaled_indices = rescale_dye(
+            self.interpolated_base_pairs,
+            rescale_size=RESCALE_SIZE,
+            target_range=(BASE_PAIR_START, BASE_PAIR_END),
+        )
+
+        data = self._rescale_profile(
+            profile,
+            rescaled_indices,
+            self.include_size_standard,
+        )
+
+        self._scaler = self.interpolated_base_pairs[rescaled_indices]
+
         
-        # Create a scaler, which is used to map a pixel index in the profile to a base pair
-        # location, i.e. the first pixel is in fact BASE_PAIR_START, the last pixel is BASE_PAIR_END
-        self._scaler = interpolated_base_pairs[rescale_dye(interpolated_base_pairs, self.size_standard)]
 
         called_alleles = None
         # Determine the called alleles from the annotations file 
@@ -192,25 +224,7 @@ class HIDImage(Image):
             # to avoid missing the scaler when we have not yet read the file.
             self._read()
         return self._scaler[np.newaxis, :]
-
-    @staticmethod
-    def _rescale_profile(profile: np.ndarray,
-                         interpolated_base_pairs: np.ndarray,
-                         size_standard: str,
-                         include_standard: bool) -> np.ndarray:
-        """
-        Rescale profile based on interpolated base pairs.
-
-        :param profile: array of dyes in chronological order
-        :param interpolated_base_pairs: the interpolated base pairs
-        :param include_standard: if the size standard should be included
-            in the final profile/data
-        :return: parsed profile as array
-        """
-        # Select profile based on include_standard flag
-        selected_profile = profile if include_standard else profile[:-1]
-        data = selected_profile[:, rescale_dye(interpolated_base_pairs, size_standard)]
-        return data[..., np.newaxis]
+    
 
     def _get_segmentation(self,
                           called_alleles: Sequence[Marker],
