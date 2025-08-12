@@ -16,4 +16,4 @@ training:
   patience: 20
   weight_decay: 0.0001
   seed: 42
-  ratio: 1
+  synth_ratio: 1

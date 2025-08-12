@@ -97,8 +97,7 @@ class InMemoryDataset(Sequence[Image]):
         Split the data of the dataset randomly into two new datasets.
         :param fraction: The fraction of the dataset that should be included in the first dataset.
         :param seed: An optional seed to make the split deterministic.
-        :return: Two datasets each holding a random subset of the original data.
-        """
+        :return: (train_set, test_set) where train_set contains `fraction` of the data, and test_set contains the rest.        """
         if not 0 <= fraction <= 1:
             raise ValueError(f"Fraction should be between 0 and 1, got {fraction}.")
 
@@ -111,6 +110,11 @@ class InMemoryDataset(Sequence[Image]):
         return dataset1, dataset2
     
     def split_by_genotypes(self, genotypes: Set[int]) -> Tuple['InMemoryDataset', 'InMemoryDataset']: ...
+    """
+    Splits the dataset into two datasets based on a set of genotypes.
+    The first dataset will contain images whose contributors are a subset of the genotypes,
+    and the second dataset will contain the rest.
+    """
 
     def split_k_fold(self, n_folds: int, seed: Optional[float] = None) -> \
             List[Tuple['SimpleDataset', 'SimpleDataset']]:

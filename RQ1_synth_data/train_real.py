@@ -86,8 +86,8 @@ def run(data_config: str,
     # Branch based on type of train_ratio
     if train_split_is_seq:
         # Genotype-based split
-        train_genotypes = set(train_ratio)
-        train_set, val_test_set = dataset.split_by_genotypes(train_genotypes)
+        test_genotypes = set(train_ratio)
+        val_test_set, train_set = dataset.split_by_genotypes(test_genotypes)
     else:
         # Ratio-based split
         train_set, val_test_set = dataset.split(train_ratio, seed)
@@ -102,6 +102,11 @@ def run(data_config: str,
             f"Each split must contain at least one item, but got "
             f"train: {len(train_set)}, val: {len(val_set)}, test: {len(test_set)}"
         )
+    
+    # Combine real and synthetic for training
+    LOGGER.info(f"Training set: {len(train_set)}")
+    LOGGER.info(f"Validation set: {len(val_set)}")
+    LOGGER.info(f"Test set: {len(test_set)}")
     
 
 

@@ -84,8 +84,8 @@ def run(real_data_config: str,
     # Branch based on type of train_ratio
     if train_split_is_seq:
         # Genotype-based split
-        train_genotypes = set(train_ratio)
-        train_set, val_test_set = real_dataset.split_by_genotypes(train_genotypes)
+        test_genotypes = set(train_ratio)
+        val_test_set, train_set = real_dataset.split_by_genotypes(test_genotypes)
     else:
         # Ratio-based split
         train_set, val_test_set = real_dataset.split(train_ratio, seed)
