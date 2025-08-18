@@ -24,7 +24,6 @@ class Image(ABC):
         """
         raise NotImplementedError
     
-    
 
     @staticmethod
     def _rescale_profile(

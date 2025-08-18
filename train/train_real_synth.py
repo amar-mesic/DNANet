@@ -14,6 +14,7 @@ import random
 import torch
 
 from DNAnet.evaluation.segmentation.allele_metrics import allele_f1_score, allele_precision, allele_recall
+from DNAnet.evaluation.segmentation.pixel_metrics import pixel_f1_score, pixel_precision, pixel_recall
 from config_io import load_config, load_dataset, load_model, load_training_config
 from DNAnet.models.base import TrainableModel
 from utils import add_file_handler_to_logger, prepare_output_file
@@ -160,10 +161,13 @@ def run(real_data_config: str,
     if log_neptune:
         # Log the final model performance
         test_predictions = model.predict_batch(test_set)
-        run['test/predictions'] = test_predictions
-        run['test/f1'] = allele_f1_score(test_set, test_predictions)
-        run['test/precision'] = allele_precision(test_set, test_predictions)
-        run['test/recall'] = allele_recall(test_set, test_predictions)
+        run['test/pixel_f1'] = float(f"{pixel_f1_score(test_set, test_predictions):.4g}")
+        run['test/pixel_precision'] = float(f"{pixel_precision(test_set, test_predictions):.4g}")
+        run['test/pixel_recall'] = float(f"{pixel_recall(test_set, test_predictions):.4g}")
+        
+        run['test/allele_f1'] = float(f"{allele_f1_score(test_set, test_predictions):.4g}")
+        run['test/allele_precision'] = float(f"{allele_precision(test_set, test_predictions):.4g}")
+        run['test/allele_recall'] = float(f"{allele_recall(test_set, test_predictions):.4g}")
 
     # Save the trained model checkpoint
     checkpoint_path = os.path.join(output_dir, "checkpoint")

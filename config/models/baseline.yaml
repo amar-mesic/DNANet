@@ -1,0 +1,4 @@
+model:
+  name: threshold
+  threshold: 75
+  apply_allele_caller: True

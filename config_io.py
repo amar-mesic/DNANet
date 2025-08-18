@@ -24,6 +24,7 @@ from DNAnet.evaluation import (
 )
 from DNAnet.models.base import Model, TrainableModel
 from DNAnet.models.segmentation.human_analysis import HumanAnalysis
+from DNAnet.models.segmentation.threshold import ThresholdSegmentationModel
 from DNAnet.models.segmentation.trainable_unet import DNANet_UNet
 from DNAnet.typing import PathLike
 from utils import get_defaults
@@ -38,7 +39,12 @@ DATASETS = {'dataset': {'hid': HIDDataset, 'custom_hid': CustomHIDDataset, 'synt
                 'NFIValidationStrategy': NFIValidationStrategy
                 }
             }
-MODELS = {'model': {'unet': DNANet_UNet, 'human_analysis': HumanAnalysis}}
+
+MODELS = {'model': {
+    'unet': DNANet_UNet, 
+    'human_analysis': HumanAnalysis,
+    'threshold': ThresholdSegmentationModel
+    }}
 METRICS = {'pixel_precision': pixel_precision,
            'pixel_recall': pixel_recall,
            'average_binary_iou': average_binary_iou,

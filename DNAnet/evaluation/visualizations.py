@@ -14,6 +14,7 @@ LOGGER = logging.getLogger("dnanet")
 
 
 DNA_CHANNELS = ('blue', 'green', 'black', 'red', 'purple', 'orange')
+GF_DYE_NAMES = ('6-FAM', 'VIC', 'NED', 'TAZ', 'SID', 'ILS')
 
 
 def _validate_input(hid_images, predictions):

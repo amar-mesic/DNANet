@@ -78,7 +78,7 @@ class NearestBasePairCaller(AlleleCaller):
         rfus = defaultdict(int)
         for dye_index, dye in enumerate(prediction_image):
             # find indices of groups of positive predictions (where logits are greater than .5)
-            positives, _ = np.where(dye >= 0.5)
+            positives = np.where(dye >= 0.5)[0]
             if positives.size == 0:  # no predictions present in this dye
                 LOGGER.warning(f"No predictions present in dye row {dye_index}")
                 continue

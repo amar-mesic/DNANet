@@ -13,6 +13,7 @@ from torch import seed
 import torch
 
 from DNAnet.evaluation.segmentation.allele_metrics import allele_f1_score, allele_precision, allele_recall
+from DNAnet.evaluation.segmentation.pixel_metrics import pixel_f1_score, pixel_precision, pixel_recall
 from config_io import load_config, load_dataset, load_model, load_training_config
 from DNAnet.models.base import TrainableModel
 from utils import add_file_handler_to_logger, prepare_output_file
@@ -142,14 +143,13 @@ def run(data_config: str,
     if log_neptune:
         # Log the final model performance
         test_predictions = model.predict_batch(test_set)
-        run['test/predictions'] = test_predictions
-        # run['test/loss'] = ...
-        run['test/f1'] = allele_f1_score(test_set, test_predictions)
-        # LOGGER.info(f"Test F1 score: {run['test/f1'].fetch()}")
-        run['test/precision'] = allele_precision(test_set, test_predictions)
-        # LOGGER.info(f"Test Precision: {run['test/precision'].fetch()}")
-        run['test/recall'] = allele_recall(test_set, test_predictions)
-        # LOGGER.info(f"Test Recall: {run['test/recall'].fetch()}
+        run['test/pixel_f1'] = float(f"{pixel_f1_score(test_set, test_predictions):.4g}")
+        run['test/pixel_precision'] = float(f"{pixel_precision(test_set, test_predictions):.4g}")
+        run['test/pixel_recall'] = float(f"{pixel_recall(test_set, test_predictions):.4g}")
+        
+        run['test/allele_f1'] = float(f"{allele_f1_score(test_set, test_predictions):.4g}")
+        run['test/allele_precision'] = float(f"{allele_precision(test_set, test_predictions):.4g}")
+        run['test/allele_recall'] = float(f"{allele_recall(test_set, test_predictions):.4g}")
 
 
 
