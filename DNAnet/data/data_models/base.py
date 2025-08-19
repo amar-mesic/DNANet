@@ -23,6 +23,11 @@ class Image(ABC):
         The raw data content of the image.
         """
         raise NotImplementedError
+
+    @data.setter
+    def data(self, value: np.ndarray):
+        raise NotImplementedError
+
     
 
     @staticmethod

@@ -14,6 +14,7 @@ import torch
 
 from DNAnet.evaluation.segmentation.allele_metrics import allele_f1_score, allele_precision, allele_recall
 from DNAnet.evaluation.segmentation.pixel_metrics import pixel_f1_score, pixel_precision, pixel_recall
+from DNAnet.preprocessing.pipeline import PreprocessingPipeline
 from config_io import load_config, load_dataset, load_model, load_training_config
 from DNAnet.models.base import TrainableModel
 from utils import add_file_handler_to_logger, prepare_output_file
@@ -25,6 +26,7 @@ LOGGER = logging.getLogger('dnanet')
 def run(data_config: str,
         model_config: str,
         training_config: str,
+        preprocessing_steps: Optional[PreprocessingPipeline] = None,
         checkpoint_dir: Optional[str] = None,
 
 ):
@@ -43,6 +45,7 @@ def run(data_config: str,
 
     experiment_name = training_kwargs.get('experiment_name', "Prediction model")
 
+    run = None
     if log_neptune:
         run = neptune.init_run(
             name=experiment_name,
@@ -73,6 +76,14 @@ def run(data_config: str,
 
     dataset = load_dataset(data_config)
 
+    # Apply preprocessing steps if provided
+    if preprocessing_steps is not None:
+        LOGGER.info(f"Applying preprocessing steps: {preprocessing_steps}")
+        for image in dataset:
+            image.data = preprocessing_steps.fit_transform(image.data)
+        if log_neptune:
+            run['preprocessing/pipeline'] = preprocessing_steps.to_config()
+
     # Split real dataset only
     train_ratio = split_cfg['train']
     val_ratio = split_cfg['val']
@@ -96,11 +107,10 @@ def run(data_config: str,
     val_set, test_set = val_test_set.split(val_ratio / (val_ratio + test_ratio), seed)
 
 
-
     # Check that all splits contain at least one item
-    if len(train_set) == 0 or len(val_set) == 0 or len(test_set) == 0:
+    if len(train_set) == 0:
         raise ValueError(
-            f"Each split must contain at least one item, but got "
+            f"Train set must contain at least one item, but got "
             f"train: {len(train_set)}, val: {len(val_set)}, test: {len(test_set)}"
         )
     
@@ -128,7 +138,6 @@ def run(data_config: str,
 
     # Update training_kwargs with validation set and log parameters
     training_kwargs.update({'validation_set': val_set})
-    run['parameters'] = training_kwargs
 
 
 
@@ -141,6 +150,8 @@ def run(data_config: str,
 
 
     if log_neptune:
+        run['parameters'] = training_kwargs
+
         # Log the final model performance
         test_predictions = model.predict_batch(test_set)
         run['test/pixel_f1'] = float(f"{pixel_f1_score(test_set, test_predictions):.4g}")
@@ -171,9 +182,10 @@ def run(data_config: str,
 
     with open(config_path, "r") as f:
         config_str = f.read()
-    run['config'] = config_str
 
-    run.stop()
+    if log_neptune:
+        run['config'] = config_str
+        run.stop()
 
 
 

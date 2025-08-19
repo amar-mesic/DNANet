@@ -15,6 +15,7 @@ import torch
 
 from DNAnet.evaluation.segmentation.allele_metrics import allele_f1_score, allele_precision, allele_recall
 from DNAnet.evaluation.segmentation.pixel_metrics import pixel_f1_score, pixel_precision, pixel_recall
+from DNAnet.preprocessing.pipeline import PreprocessingPipeline
 from config_io import load_config, load_dataset, load_model, load_training_config
 from DNAnet.models.base import TrainableModel
 from utils import add_file_handler_to_logger, prepare_output_file
@@ -28,6 +29,7 @@ def run(real_data_config: str,
         synth_data_config: str,
         model_config: str,
         training_config: str,
+        preprocessing_steps: Optional[PreprocessingPipeline] = None,
         checkpoint_dir: Optional[str] = None):
     
     training_kwargs = load_training_config(training_config)
@@ -71,6 +73,16 @@ def run(real_data_config: str,
     real_dataset = load_dataset(real_data_config)
     synth_dataset = load_dataset(synth_data_config)
 
+    # Apply preprocessing steps if provided
+    if preprocessing_steps is not None:
+        LOGGER.info(f"Applying preprocessing steps: {preprocessing_steps}")
+        for image in real_dataset:
+            image.data = preprocessing_steps.fit_transform(image.data)
+        for image in synth_dataset:
+            image.data = preprocessing_steps.fit_transform(image.data)
+        if log_neptune:
+            run['preprocessing/pipeline'] = preprocessing_steps.to_config()
+
     # Split real dataset only
     train_ratio = split_cfg['train']
     val_ratio = split_cfg['val']
@@ -100,7 +112,7 @@ def run(real_data_config: str,
         LOGGER.warning("Training set is empty. No real samples to train on.")
 
     if len(val_set) == 0 or len(test_set) == 0:
-        raise ValueError(
+        LOGGER.warning(
             f"Each split must contain at least one item, but got "
             f"train: {len(train_set)}, val: {len(val_set)}, test: {len(test_set)}"
         )

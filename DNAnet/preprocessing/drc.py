@@ -5,7 +5,7 @@ from DNAnet.preprocessing.base import PreprocessingStep
 
 class DynamicRangeCompress(PreprocessingStep):
     """Dynamic range compression preprocessing step supporting multiple monotonic functions."""
-    def __init__(self, method: str = 'tanh', factor: float = 1.0, custom_func: Optional[Callable[[np.ndarray], np.ndarray]] = None):
+    def __init__(self, method: str = 'tanh', factor: float = 1.0):
         """
         Parameters
         ----------
@@ -18,7 +18,6 @@ class DynamicRangeCompress(PreprocessingStep):
         """
         self.method = method
         self.factor = factor
-        self.custom_func = custom_func
 
     def fit(self, data: np.ndarray, y: Any = None, **kwargs) -> 'DynamicRangeCompress':
         return self
@@ -29,8 +28,6 @@ class DynamicRangeCompress(PreprocessingStep):
         elif self.method == 'log':
             # Add 1 to avoid log(0); assumes data >= 0
             return np.log1p(np.abs(data) / self.factor) * np.sign(data) * self.factor
-        elif self.method == 'custom' and self.custom_func is not None:
-            return self.custom_func(data)
         else:
             raise ValueError(f"Unknown compression method: {self.method}")
 

@@ -22,3 +22,12 @@ class PreprocessingPipeline(PreprocessingStep):
         for step in self.steps:
             data = step.fit_transform(data, y)
         return data
+    
+
+    def to_config(self):
+        return [step.to_config() for step in self.steps]
+
+    @classmethod
+    def from_config(cls, cfg):
+        steps = [globals()[c["name"]].from_config(c) for c in cfg]
+        return cls(steps)

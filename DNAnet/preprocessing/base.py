@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Dict
 import numpy as np
 
 class PreprocessingStep(ABC):
@@ -26,3 +26,16 @@ class PreprocessingStep(ABC):
         """Fit to ``data`` and return the transformed result."""
         self.fit(data, y, **kwargs)
         return self.transform(data)
+    
+    
+
+    def to_config(self) -> Dict[str, Any]:
+        """Return a JSON‑serialisable description of this step."""
+        params = {k: v for k, v in self.__dict__.items()
+                  if not k.startswith("_")}
+        return {"name": self.__class__.__name__, "params": params}
+
+
+    @classmethod
+    def from_config(cls, cfg: Dict[str, Any]) -> "PreprocessingStep":
+        return cls(**cfg["params"])

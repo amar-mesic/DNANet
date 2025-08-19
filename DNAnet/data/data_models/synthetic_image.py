@@ -52,6 +52,10 @@ class SyntheticImage(Image):
                 self._data = self._read()
             return self._data
         return self._read()
+    
+    @data.setter
+    def data(self, value: np.ndarray):
+        self._data = value
 
     def _read(self) -> Optional[np.ndarray]:
         if not self.path.exists():
