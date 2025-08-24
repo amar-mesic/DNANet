@@ -1,0 +1,21 @@
+training:
+  experiment_name: 本地-256+0长-0真:1新假-考试假-预：缩放
+  checkpoint_dir: "checkpoints/"
+  log_neptune: true
+  batch_size: 32
+  num_epochs: 200
+  steps_per_epoch:
+  use_evaluation_metric: true
+  save_best: true
+  use_scheduler: true
+  scheduler_type: OneCycleLR # "exponential", "warmup_cosine", "OneCycleLR", "ReduceLROnPlateau"
+  learning_rate: 0.001
+  scheduler_gamma: 0.8
+  pct_start: 0.3
+  min_lr: 1.0e-05
+  min_delta: -1.0             # -1 -> no early stopping
+  patience: 20
+  weight_decay: 0.0001
+  tensorboard: false
+  seed: 42
+  synth_ratio: 10000000000000

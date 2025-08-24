@@ -76,8 +76,8 @@ def run(real_data_config: str,
 
     # Confirm if datasets are properly scaled
     if log_neptune:
-        real_data = np.stack([image.data for image in real_dataset])
-        synth_data = np.stack([image.data for image in synth_dataset])
+        real_data = [] if len(real_dataset) == 0 else np.stack([image.data for image in real_dataset])
+        synth_data = [] if len(synth_dataset) == 0 else np.stack([image.data for image in synth_dataset])
         fig = plot_lanes_overlay(real_data, synth_data, n_lanes=5, show_synth=True)
         run["visualizations/train_set_distribution"].append(fig)
 
@@ -156,9 +156,9 @@ def run(real_data_config: str,
 
     # Confirm if scaling is still valid at the end
     if log_neptune:
-        train_data = np.stack([image.data for image in combined_train_set])
-        val_data = np.stack([image.data for image in val_set])
-        test_data = np.stack([image.data for image in test_set])
+        train_data = [] if len(combined_train_set) == 0 else np.stack([image.data for image in combined_train_set])
+        val_data = [] if len(val_set) == 0 else np.stack([image.data for image in val_set])
+        test_data = [] if len(test_set) == 0 else np.stack([image.data for image in test_set])
         # combine val and test data
         val_test_data = np.concatenate([val_data, test_data], axis=0)
 

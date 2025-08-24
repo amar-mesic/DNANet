@@ -2,7 +2,7 @@ dataset:
   name: custom_hid # does it matter? Yes, it decides which constructor is used
   root_path: /Users/amarmesic/Documents/tudelft/thesis/datasets/USE THIS - PROVEDIt_2-5-Person Profiles_3500 5sec_GF29cycles
   panel_path: resources/data/ProvedIt/SGPanel_Globalfiler_Panel.xml
-  limit:
+  limit: 0
   shuffle: false
   adjustment_of_annotations: top
   size_standard: GENESCAN_600_LIZ
@@ -11,7 +11,7 @@ dataset:
   sample_validation_strategy:
     name: NFIValidationStrategy
     
-split:
-  train: [39, 40, 41, 42, 43]
-  val: 0.5
-  test: 0.5
+# split:
+#   train: 0.0
+#   val: 0.5
+#   test: 0.5
