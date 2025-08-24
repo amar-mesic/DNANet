@@ -236,6 +236,9 @@ class DNANet_UNet(TrainableModel):
         # Determine the number of steps per epoch if it was not specified.
         if not steps_per_epoch:
             steps_per_epoch = max(1, len(dataset) // batch_size)
+            LOGGER.info(f"Setting `steps_per_epoch` to {steps_per_epoch}")
+        LOGGER.info(f"Training for {num_epochs} epochs with batch size "
+                    f"{batch_size} for {len(dataset)} images in dataset.")
 
         if validation_set:
             steps_per_epoch_val = len(validation_set) // batch_size
@@ -337,12 +340,12 @@ class DNANet_UNet(TrainableModel):
 
                     # Log images to Neptune
                     if (epoch % 10 == 0 or epoch == num_epochs - 1):
-                        # Select the image(s) you want to visualize
+                        # Take a sample from the validation set
                         sample_images = validation_set[:1]  # or any subset
                         predictions = self.predict_batch(sample_images)
                         
                         # Generate the plot (returns a matplotlib Figure)
-                        fig = plot_profile(sample_images, predictions, prediction_as_mask=False, title=True)
+                        fig = plot_profile(sample_images, predictions, prediction_as_mask=False, title=True, return_fig=True)
                         
                         # Log to Neptune (as a plot object)
                         neptune_run["visualizations/decision_boundary"].append(fig)

@@ -28,7 +28,8 @@ def plot_profile(hid_images: Sequence[HIDImage],
                  predictions: Sequence[Prediction] = None,
                  prediction_as_mask: bool = True,
                  title: bool = True,
-                 feature_maps: Sequence[np.ndarray] = None,) -> Optional[plt.Figure]:
+                 feature_maps: Sequence[np.ndarray] = None,
+                 return_fig: bool = False) -> Optional[plt.Figure]:
     """
     Plot peaks from the DNA profile. If present, called alleles
     are plotted as green mask for each dye.  Optionally, prediction
@@ -87,7 +88,8 @@ def plot_profile(hid_images: Sequence[HIDImage],
             fig.suptitle(title_string, fontsize=16)
 
         plt.show()
-    return fig
+    if return_fig:
+        return fig
 
 
 def _plot_profile(axs,
@@ -228,3 +230,50 @@ def plot_profile_markers(
 
         fig.suptitle(f'{image.path.name}')
         plt.show()
+
+
+def plot_lanes_overlay(reals, synths = None, n_lanes=1, show_real=True, show_synth=True, height=6):
+    """
+    Plots stacked overlays of the last n_lanes for real and/or synthetic EPGs.
+    Args:
+        reals: list of np.arrays (real EPGs)
+        synths: list of np.arrays (synthetic EPGs)
+        n_lanes: int, number of final lanes to plot (default 1)
+        show_real: bool, whether to plot real EPGs
+        show_synth: bool, whether to plot synthetic EPGs
+        height: float, height of each lane in the plot (default 6)
+    """
+
+
+    def get_lanes(arr, n):
+        # if arr.ndim == 4:
+        #     # (1, no_dyes, scan_len, 1)
+        #     return [arr[0, -i, :, 0] for i in range(n, 0, -1)]
+        if arr.ndim == 3:
+            # (no_dyes, scan_len, 1)
+            return [arr[-i, :, 0] for i in range(n, 0, -1)]
+        else:
+            raise ValueError(f"Unexpected array shape: {arr.shape}")
+
+    fig, axes = plt.subplots(n_lanes, 1, figsize=(14, height*n_lanes), sharex=True)
+    if n_lanes == 1:
+        axes = [axes]
+
+    for lane_idx in range(n_lanes):
+        ax = axes[lane_idx]
+        if show_real:
+            for arr in reals:
+                lanes = get_lanes(arr, n_lanes)
+                ax.plot(lanes[lane_idx], color='green', alpha=0.4, linewidth=1, label='Real' if lane_idx==0 else None)
+        if show_synth and synths is not None:
+            for arr in synths:
+                lanes = get_lanes(arr, n_lanes)
+                ax.plot(lanes[lane_idx], color='red', alpha=0.4, linewidth=1, label='Synthetic' if lane_idx==0 else None)
+        ax.set_ylabel(f"Lane {reals.shape[1]-n_lanes+lane_idx+1} Intensity (RFU)")
+        if lane_idx == 0:
+            ax.set_title(f"Overlay of Last {n_lanes} Dye Lanes for Real (green) and Synthetic (red) EPGs")
+        if lane_idx == n_lanes-1:
+            ax.set_xlabel("Scan Points")
+
+    plt.tight_layout()
+    return fig

@@ -1,5 +1,6 @@
 import json
 import logging
+from math import log
 import os
 from datetime import datetime
 import random
@@ -14,10 +15,12 @@ import torch
 
 from DNAnet.evaluation.segmentation.allele_metrics import allele_f1_score, allele_precision, allele_recall
 from DNAnet.evaluation.segmentation.pixel_metrics import pixel_f1_score, pixel_precision, pixel_recall
+from DNAnet.evaluation.visualizations import plot_lanes_overlay
 from DNAnet.preprocessing.pipeline import PreprocessingPipeline
 from config_io import load_config, load_dataset, load_model, load_training_config
 from DNAnet.models.base import TrainableModel
 from utils import add_file_handler_to_logger, prepare_output_file
+from DNAnet.models.segmentation.trainable_unet import DNANet_UNet
 
 
 LOGGER = logging.getLogger('dnanet')
@@ -45,7 +48,7 @@ def run(data_config: str,
 
     experiment_name = training_kwargs.get('experiment_name', "Prediction model")
 
-    run = None
+    run: neptune.init_run
     if log_neptune:
         run = neptune.init_run(
             name=experiment_name,
@@ -75,6 +78,14 @@ def run(data_config: str,
     LOGGER.info(f"Split configuration: {split_cfg}")
 
     dataset = load_dataset(data_config)
+
+
+    # Confirm if dataset is properly scaled
+    if log_neptune:
+        all_data = np.stack([image.data for image in dataset])
+        fig = plot_lanes_overlay(all_data, n_lanes=5, show_synth=False)
+        run["visualizations/train_set_distribution"].append(fig)
+
 
     # Apply preprocessing steps if provided
     if preprocessing_steps is not None:
@@ -118,13 +129,23 @@ def run(data_config: str,
     LOGGER.info(f"Training set: {len(train_set)}")
     LOGGER.info(f"Validation set: {len(val_set)}")
     LOGGER.info(f"Test set: {len(test_set)}")
-    
 
 
+    # Confirm if datasets are properly scaled
+    if log_neptune:
+        train_data = np.stack([image.data for image in train_set])
+        val_data = np.stack([image.data for image in val_set])
+        test_data = np.stack([image.data for image in test_set])
+        # combine val and test data
+        val_test_data = np.concatenate([val_data, test_data], axis=0)
+
+        fig = plot_lanes_overlay(train_data, val_test_data, n_lanes=5, show_synth=True)
+        run["visualizations/train_set_distribution"].append(fig)
 
 
     # pick the model architecture, and load in pretrained checkpoint weights if available
     model = load_model(model_config)
+    model: DNANet_UNet = model  # type casting for type hinting
     if checkpoint_dir:
         model.load(checkpoint_dir)
         LOGGER.info(f"Loading previous model checkpoint from {checkpoint_dir}")

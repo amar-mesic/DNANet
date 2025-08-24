@@ -15,6 +15,7 @@ import torch
 
 from DNAnet.evaluation.segmentation.allele_metrics import allele_f1_score, allele_precision, allele_recall
 from DNAnet.evaluation.segmentation.pixel_metrics import pixel_f1_score, pixel_precision, pixel_recall
+from DNAnet.evaluation.visualizations import plot_lanes_overlay
 from DNAnet.preprocessing.pipeline import PreprocessingPipeline
 from config_io import load_config, load_dataset, load_model, load_training_config
 from DNAnet.models.base import TrainableModel
@@ -72,6 +73,14 @@ def run(real_data_config: str,
     # Load datasets
     real_dataset = load_dataset(real_data_config)
     synth_dataset = load_dataset(synth_data_config)
+
+    # Confirm if datasets are properly scaled
+    if log_neptune:
+        real_data = np.stack([image.data for image in real_dataset])
+        synth_data = np.stack([image.data for image in synth_dataset])
+        fig = plot_lanes_overlay(real_data, synth_data, n_lanes=5, show_synth=True)
+        run["visualizations/train_set_distribution"].append(fig)
+
 
     # Apply preprocessing steps if provided
     if preprocessing_steps is not None:
@@ -139,9 +148,22 @@ def run(real_data_config: str,
 
     # Combine real and synthetic for training
     combined_train_set = list(train_set) + synth_train_set
-    LOGGER.info(f"Training set: {len(train_set)} real + {len(synth_train_set)} synthetic (ratio used: {actual_ratio})")
+    LOGGER.info(f"Training set: {len(train_set)} real + {len(synth_train_set)} synthetic = {len(combined_train_set)} total (ratio used: {actual_ratio})")
     LOGGER.info(f"Validation set: {len(val_set)} real only")
     LOGGER.info(f"Test set: {len(test_set)} real only")
+
+
+
+    # Confirm if scaling is still valid at the end
+    if log_neptune:
+        train_data = np.stack([image.data for image in combined_train_set])
+        val_data = np.stack([image.data for image in val_set])
+        test_data = np.stack([image.data for image in test_set])
+        # combine val and test data
+        val_test_data = np.concatenate([val_data, test_data], axis=0)
+
+        fig = plot_lanes_overlay(train_data, val_test_data, n_lanes=5, show_synth=True)
+        run["visualizations/train_set_distribution"].append(fig)
 
 
 

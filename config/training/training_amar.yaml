@@ -1,9 +1,10 @@
 training:
-  experiment_name: test-preprocessing #最好U网-0真:256假均匀高斯-不早停-lr0.001-用cyc调度0.3-第1
+  experiment_name: 本地-256长-0真:1假-考试假-预：缩放
   checkpoint_dir: "checkpoints/"
   log_neptune: true
   batch_size: 32
   num_epochs: 200
+  steps_per_epoch:
   use_evaluation_metric: true
   save_best: true
   use_scheduler: true
@@ -15,5 +16,5 @@ training:
   min_delta: -1.0             # -1 -> no early stopping
   patience: 20
   weight_decay: 0.0001
+  tensorboard: false
   seed: 42
-  synth_ratio: 1
