@@ -199,7 +199,7 @@ class DNANet_UNet(TrainableModel):
                 scheduler = OneCycleLR(
                     optimizer,
                     max_lr=learning_rate,
-                    total_steps=num_epochs * (len(dataset) // batch_size),
+                    total_steps=num_epochs， #* (len(dataset) // batch_size),
                     pct_start=pct_start,
                     anneal_strategy='cos',
                     div_factor=learning_rate/min_lr,
