@@ -16,6 +16,7 @@ import torch
 from DNAnet.evaluation.segmentation.allele_metrics import allele_f1_score, allele_precision, allele_recall
 from DNAnet.evaluation.segmentation.pixel_metrics import pixel_f1_score, pixel_precision, pixel_recall
 from DNAnet.evaluation.visualizations import plot_lanes_overlay
+from DNAnet.models.segmentation.trainable_unet import DNANet_UNet
 from DNAnet.preprocessing.pipeline import PreprocessingPipeline
 from config_io import load_config, load_dataset, load_model, load_training_config
 from DNAnet.models.base import TrainableModel
@@ -170,6 +171,7 @@ def run(real_data_config: str,
 
     # pick the model architecture, and load in pretrained checkpoint weights if available
     model = load_model(model_config)
+    model: DNANet_UNet = model  # type casting for type hinting
     if checkpoint_dir:
         model.load(checkpoint_dir)
         LOGGER.info(f"Loading previous model checkpoint from {checkpoint_dir}")
@@ -179,10 +181,10 @@ def run(real_data_config: str,
     # Ensure the model has a .fit() method
     if not isinstance(model, TrainableModel):
         raise ValueError(f"Model {model} is not trainable.")
-
-    training_kwargs.update({'validation_set': val_set})
+    
     if log_neptune:
         run['parameters'] = training_kwargs
+    training_kwargs.update({'validation_set': val_set})
 
     # Run the training loop
     LOGGER.info("Starting training...")

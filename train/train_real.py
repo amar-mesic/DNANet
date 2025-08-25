@@ -158,6 +158,8 @@ def run(data_config: str,
         raise ValueError(f"Model {model} is not trainable.")
 
     # Update training_kwargs with validation set and log parameters
+    if log_neptune:
+        run['parameters'] = training_kwargs
     training_kwargs.update({'validation_set': val_set})
 
 
@@ -171,8 +173,6 @@ def run(data_config: str,
 
 
     if log_neptune:
-        run['parameters'] = training_kwargs
-
         # Log the final model performance
         test_predictions = model.predict_batch(test_set)
         run['test/pixel_f1'] = float(f"{pixel_f1_score(test_set, test_predictions):.4g}")

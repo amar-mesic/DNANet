@@ -4,7 +4,7 @@ dataset:
   panel_path: /Users/amarmesic/Documents/tudelft/thesis/DNANet/resources/data/ProvedIt/SGPanel_Globalfiler_Panel.xml
   reference_genotype_path: /Users/amarmesic/Documents/tudelft/thesis/dna/generated_epgs/fixed_ratios_base_template_500_5000_scaled_uniform_z-BEST/reference_genotypes
   epg_to_genotypes_mapping_path: /Users/amarmesic/Documents/tudelft/thesis/dna/generated_epgs/fixed_ratios_base_template_500_5000_scaled_uniform_z-BEST/alleles_to_genotypes_mapping.csv
-  limit: 
+  limit: 5
   shuffle: false
   adjustment_of_annotations: top
   size_standard: SYNTHETIC_GENESCAN_600_LIZ
@@ -13,7 +13,7 @@ dataset:
   sample_validation_strategy:
     name: NFIValidationStrategy
 
-split:
-  train: 0.8
-  val: 0.1
-  test: 0.1
+# split:
+#   train: 0.8
+#   val: 0.1
+#   test: 0.1

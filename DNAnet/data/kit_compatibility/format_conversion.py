@@ -38,6 +38,9 @@ def individualize_genotypes(
         sample_name = row[exclude_columns[0]]  # e.g., 'Sample ID'
         data = []
         for marker in marker_columns:
+            #skip the marker if the value is NaN or empty
+            if pd.isna(row[marker]) or row[marker] == "":
+                continue
             alleles = str(row[marker]).split(',')
             allele1 = alleles[0] if len(alleles) > 0 else ''
             allele2 = alleles[1] if len(alleles) > 1 else ''
