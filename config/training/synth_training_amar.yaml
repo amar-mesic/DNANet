@@ -1,5 +1,5 @@
 training:
-  experiment_name: 670+长-1正真:0正假-预：缩放-种42
+  experiment_name: 试验-670+长-1正真:0正假-预：缩放-种42
   checkpoint_dir: "checkpoints/"
   log_neptune: true
   batch_size: 32

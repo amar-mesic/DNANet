@@ -303,10 +303,6 @@ class DNANet_UNet(TrainableModel):
 
                 
                 if neptune_run:
-                    neptune_run['loss/training'].log(training_loss, step=epoch)
-                    # neptune_run['accuracy/training'].log(
-                    # metrics[0].compute(), step=epoch)
-
                     # Log the training and validation loss and metrics to Neptune
                     neptune_run['loss/validation'].log(validation_loss, step=epoch)
                     neptune_run['accuracy/validation'].log(validation_metric, step=epoch)
@@ -333,24 +329,6 @@ class DNANet_UNet(TrainableModel):
                         pixel_recall(validation_set, predictions), step=epoch
                     )
 
-                    # Log the learning rate to Neptune
-                    neptune_run['learning-rate'].log(
-                        optimizer.param_groups[0]["lr"], step=epoch
-                    )
-
-                    # Log images to Neptune
-                    if (epoch % 10 == 0 or epoch == num_epochs - 1):
-                        # Take a sample from the validation set
-                        sample_images = validation_set[:1]  # or any subset
-                        predictions = self.predict_batch(sample_images)
-                        
-                        # Generate the plot (returns a matplotlib Figure)
-                        fig = plot_profile(sample_images, predictions, prediction_as_mask=False, title=True, return_fig=True)
-                        
-                        # Log to Neptune (as a plot object)
-                        neptune_run["visualizations/decision_boundary"].append(fig)
-                        plt.close(fig)  # Close the figure to avoid memory leaks
-
 
 
                 # If `save_best` is True, keep track of the model with the best
@@ -369,6 +347,30 @@ class DNANet_UNet(TrainableModel):
                 elif epoch - prev_best[1] > patience:
                     LOGGER.info(f"Early stopping reached at epoch {epoch + 1}.")
                     break
+
+
+
+            if neptune_run:
+                neptune_run['loss/training'].log(training_loss, step=epoch)
+
+                # Log the learning rate to Neptune
+                neptune_run['learning-rate'].log(
+                    optimizer.param_groups[0]["lr"], step=epoch
+                )
+
+                # Log images to Neptune
+                if (epoch % 10 == 0 or epoch == num_epochs - 1):
+                    # Take a sample from the validation set
+                    sample_images = dataset[:1]  # or any subset
+                    predictions = self.predict_batch(sample_images)
+                    
+                    # Generate the plot (returns a matplotlib Figure)
+                    fig = plot_profile(sample_images, predictions, prediction_as_mask=False, title=True, return_fig=True)
+                    
+                    # Log to Neptune (as a plot object)
+                    neptune_run["visualizations/decision_boundary"].append(fig)
+                    plt.close(fig)  # Close the figure to avoid memory leaks
+
 
             if use_scheduler:
                 if isinstance(scheduler, ReduceLROnPlateau):

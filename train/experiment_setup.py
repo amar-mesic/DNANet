@@ -142,7 +142,7 @@ def overlay_tvt_datasets(train_set, val_set, test_set, run):
     val_data = [] if len(val_set) == 0 else np.stack([image.data for image in val_set])
     test_data = [] if len(test_set) == 0 else np.stack([image.data for image in test_set])
     # combine val and test data
-    val_test_data = np.concatenate([val_data, test_data], axis=0)
+    val_test_data = test_data if len(val_data) == 0 else np.concatenate([val_data, test_data], axis=0)
 
     fig = plot_lanes_overlay(train_data, val_test_data, n_lanes=5, show_synth=True)
     run["visualizations/train_set_distribution"].append(fig)
