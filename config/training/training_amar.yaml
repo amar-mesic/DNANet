@@ -1,12 +1,12 @@
 training:
-  experiment_name: 本地-256长-0真:1假-考试假-预：缩放
+  experiment_name: 本地-test #256长-0真:1假-考试假-预：缩放
   checkpoint_dir: "checkpoints/"
   log_neptune: true
   batch_size: 32
   num_epochs: 200
   steps_per_epoch:
   use_evaluation_metric: true
-  save_best: true
+  save_best: false
   use_scheduler: true
   scheduler_type: OneCycleLR # "exponential", "warmup_cosine", "OneCycleLR", "ReduceLROnPlateau"
   learning_rate: 0.001

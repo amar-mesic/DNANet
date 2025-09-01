@@ -198,7 +198,8 @@ def plot_profile_markers(
     hid_images: Sequence[HIDImage],
     predictions: Sequence[Prediction] = None,
     marker_name: Optional[str] = None,
-    zoom_x_values: Optional[Tuple[int, int]] = None
+    zoom_x_values: Optional[Tuple[int, int]] = None,
+    title: Optional[str] = None
 ):
     """
     Plot the profile with optional annotations and predictions per marker of for a single
@@ -228,7 +229,10 @@ def plot_profile_markers(
                 ax = axs[i // 3, i % 3]
                 _plot_profile_marker(marker, image, prediction, ax, zoom_x_values)
 
-        fig.suptitle(f'{image.path.name}')
+        if title:
+            plt.title(title)
+        else:
+            fig.suptitle(f'{image.path.name}')
         plt.show()
 
 

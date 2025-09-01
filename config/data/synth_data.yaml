@@ -1,10 +1,9 @@
 dataset:
-  name: synth_data # does it matter? Yes, it decides which constructor is used
-  root_path: /Users/amarmesic/Documents/tudelft/thesis/dna/generated_epgs/fixed_ratios_base_template_500_5000_scaled_uniform_z-BEST
-  panel_path: /Users/amarmesic/Documents/tudelft/thesis/DNANet/resources/data/ProvedIt/SGPanel_Globalfiler_Panel.xml
-  reference_genotype_path: /Users/amarmesic/Documents/tudelft/thesis/dna/generated_epgs/fixed_ratios_base_template_500_5000_scaled_uniform_z-BEST/reference_genotypes
-  epg_to_genotypes_mapping_path: /Users/amarmesic/Documents/tudelft/thesis/dna/generated_epgs/fixed_ratios_base_template_500_5000_scaled_uniform_z-BEST/alleles_to_genotypes_mapping.csv
-  limit: 5
+  name: synth_data
+  root_path: /Users/amarmesic/Documents/tudelft/thesis/dna/generated_epgs/fixed_ratios_all_loci_thresh_15
+  panel_path: resources/data/ProvedIt/SGPanel_Globalfiler_Panel.xml
+  reference_genotype_path: /Users/amarmesic/Documents/tudelft/thesis/dna/generated_epgs/fixed_ratios_all_loci_thresh_15/reference_genotypes
+  epg_to_genotypes_mapping_path: /Users/amarmesic/Documents/tudelft/thesis/dna/generated_epgs/fixed_ratios_all_loci_thresh_15/alleles_to_genotypes_mapping.csv
   shuffle: false
   adjustment_of_annotations: top
   size_standard: SYNTHETIC_GENESCAN_600_LIZ

@@ -19,6 +19,7 @@ from DNAnet.evaluation.visualizations import plot_lanes_overlay
 from DNAnet.preprocessing.pipeline import PreprocessingPipeline
 from config_io import load_config, load_dataset, load_model, load_training_config
 from DNAnet.models.base import TrainableModel
+from train.experiment_setup import create_output_dir, load_and_pretrain_model, overlay_tvt_datasets, save_model_config, set_random_seeds, setup_logging, setup_neptune, split_dataset
 from utils import add_file_handler_to_logger, prepare_output_file
 from DNAnet.models.segmentation.trainable_unet import DNANet_UNet
 
@@ -35,47 +36,26 @@ def run(data_config: str,
 ):
     
     training_kwargs = load_training_config(training_config)
-    log_neptune = training_kwargs.get('log_neptune', False)
+    log_neptune = training_kwargs['log_neptune']
     
     # Set random seeds for reproducibility
     seed = training_kwargs.get('seed', 42)
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    set_random_seeds(seed)
 
-    experiment_name = training_kwargs.get('experiment_name', "Prediction model")
+    run: neptune.init_run = setup_neptune(log_neptune, training_kwargs)
 
-    run: neptune.init_run
-    if log_neptune:
-        run = neptune.init_run(
-            name=experiment_name,
-            # key="MOD", 
-            project="amar-mesic/dna-thesis", 
-            api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJkOTQ1Njc4MC0yOTcyLTRlMmQtYTMwMy0xOGYxZTAwMmIzZGUifQ==", # your credentials
-        )
-
-
-    
     # Set up output directory
-    output_dir = os.path.join("output", experiment_name, datetime.now().strftime("%Y%m%d_%H%M%S"))
-    os.makedirs(output_dir, exist_ok=True)
+    output_dir = create_output_dir(training_kwargs['experiment_name'])
 
     # Set up logging to file
-    log_path = prepare_output_file(os.path.join(output_dir, 'log_training.txt'))
-    add_file_handler_to_logger(LOGGER, path=log_path)
-    LOGGER.info(f"Logs will be written to {log_path}")
+    setup_logging(output_dir, LOGGER)
 
 
     
 
     # Load the full config, not just dataset
     full_config = load_config(data_config, kind='data')
-    split_cfg = full_config.get('split', {'train': 0.8, 'val': 0.1, 'test': 0.1})
-    # log the split configuration
-    LOGGER.info(f"Split configuration: {split_cfg}")
+    split_cfg = full_config.get('split')
 
     dataset = load_dataset(data_config)
 
@@ -95,73 +75,21 @@ def run(data_config: str,
         if log_neptune:
             run['preprocessing/pipeline'] = preprocessing_steps.to_config()
 
-    # Split real dataset only
-    train_ratio = split_cfg['train']
-    val_ratio = split_cfg['val']
-    test_ratio = split_cfg['test']
-
-    train_split_is_seq = isinstance(train_ratio, confidence.models.ConfigurationSequence) # type: ignore
-    total = 0 if train_split_is_seq else train_ratio
-    total += val_ratio + test_ratio
-    if not abs(total - 1.0) < 1e-6:
-        raise ValueError(f"Split proportions must sum to 1.0, but got {total}.")
-
-    # Branch based on type of train_ratio
-    if train_split_is_seq:
-        # Genotype-based split
-        test_genotypes = set(train_ratio)
-        val_test_set, train_set = dataset.split_by_genotypes(test_genotypes)
-    else:
-        # Ratio-based split
-        train_set, val_test_set = dataset.split(train_ratio, seed)
-
-    val_set, test_set = val_test_set.split(val_ratio / (val_ratio + test_ratio), seed)
-
-
-    # Check that all splits contain at least one item
-    if len(train_set) == 0:
-        raise ValueError(
-            f"Train set must contain at least one item, but got "
-            f"train: {len(train_set)}, val: {len(val_set)}, test: {len(test_set)}"
-        )
     
-    # Combine real and synthetic for training
-    LOGGER.info(f"Training set: {len(train_set)}")
-    LOGGER.info(f"Validation set: {len(val_set)}")
-    LOGGER.info(f"Test set: {len(test_set)}")
+    # Split real dataset only
+    train_set, val_set, test_set = split_dataset(dataset, split_cfg, seed, one_dataset=True)
 
 
     # Confirm if datasets are properly scaled
     if log_neptune:
-        train_data = np.stack([image.data for image in train_set])
-        val_data = np.stack([image.data for image in val_set])
-        test_data = np.stack([image.data for image in test_set])
-        # combine val and test data
-        val_test_data = np.concatenate([val_data, test_data], axis=0)
-
-        fig = plot_lanes_overlay(train_data, val_test_data, n_lanes=5, show_synth=True)
-        run["visualizations/train_set_distribution"].append(fig)
+        overlay_tvt_datasets(train_set, val_set, test_set, run)
 
 
     # pick the model architecture, and load in pretrained checkpoint weights if available
-    model = load_model(model_config)
-    model: DNANet_UNet = model  # type casting for type hinting
-    if checkpoint_dir:
-        model.load(checkpoint_dir)
-        LOGGER.info(f"Loading previous model checkpoint from {checkpoint_dir}")
-    else:
-        LOGGER.info("Will start training from scratch")
+    model: DNANet_UNet = load_and_pretrain_model(model_config, checkpoint_dir)
 
-
-    # Ensure the model has a .fit() method
-    if not isinstance(model, TrainableModel):
-        raise ValueError(f"Model {model} is not trainable.")
-
-    # Update training_kwargs with validation set and log parameters
-    if log_neptune:
-        run['parameters'] = training_kwargs
+    # Update training_kwargs with validation set
     training_kwargs.update({'validation_set': val_set})
-
 
 
     # Run the training loop
@@ -170,6 +98,8 @@ def run(data_config: str,
         model.fit(train_set, neptune_run=run, **training_kwargs)
     except KeyboardInterrupt:
         LOGGER.info("Training interrupted!")
+
+
 
 
     if log_neptune:
@@ -190,39 +120,10 @@ def run(data_config: str,
     model.save(checkpoint_path)
     LOGGER.info(f"Model checkpoint saved to {checkpoint_path}")
 
-    # Save the config files for reproducibility
-    config_path = os.path.join(output_dir, 'config_used.yaml')
-    complete_config = simple_dump_config(
-        config_path,
-        os.path.join("config", "data", data_config),
-        os.path.join("config", "models", model_config),
-        os.path.join("config", "training", training_config)
-    )
-    LOGGER.info(f"Config written to {config_path}")
 
-
-    with open(config_path, "r") as f:
-        config_str = f.read()
+    
+    config_str = save_model_config(output_dir, data_config, model_config, training_config)
 
     if log_neptune:
         run['config'] = config_str
         run.stop()
-
-
-
-
-
-
-def simple_dump_config(
-    path: str,
-    data_config_path: str,
-    model_config_path: str,
-    training_config_path: str
-):
-    config = {}
-    config['data'] = dict(loadf(data_config_path))
-    config['model'] = dict(loadf(model_config_path))
-    if training_config_path:
-        config['training'] = dict(loadf(training_config_path))
-    dumpf(Configuration(config), path)
-    return config

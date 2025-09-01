@@ -1,12 +1,12 @@
 training:
-  experiment_name: 本地-256+0长-0真:1新假-考试假-预：缩放
+  experiment_name: 670+长-1正真:0正假-预：缩放-种42
   checkpoint_dir: "checkpoints/"
   log_neptune: true
   batch_size: 32
-  num_epochs: 200
+  num_epochs: 100
   steps_per_epoch:
   use_evaluation_metric: true
-  save_best: true
+  save_best: false
   use_scheduler: true
   scheduler_type: OneCycleLR # "exponential", "warmup_cosine", "OneCycleLR", "ReduceLROnPlateau"
   learning_rate: 0.001
@@ -18,4 +18,4 @@ training:
   weight_decay: 0.0001
   tensorboard: false
   seed: 42
-  synth_ratio: 1
+  synth_ratio: 0
