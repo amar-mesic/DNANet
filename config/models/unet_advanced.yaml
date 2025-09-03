@@ -1,0 +1,6 @@
+model:
+  name: unet
+  depth: 4
+  kernel_size: [1, 25]   # height, width, fr 10, 25
+  num_filters: 8
+  apply_allele_caller: True
