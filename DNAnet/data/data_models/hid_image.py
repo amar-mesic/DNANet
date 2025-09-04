@@ -16,7 +16,7 @@ from DNAnet.data.parsing import get_peak_data, parse_called_alleles
 from DNAnet.data.utils import (
     assert_image_data_valid_format,
     basepair_interpolator,
-    extract_ss_peaks,
+    extract_ss_peaks_new,
     find_peak_boundary,
     find_peak_idx_near_or_in_range,
     rescale_dye,
@@ -113,7 +113,7 @@ class HIDImage(Image):
         
 
         size_standard_dye_lane = np.array(profile[-1])
-        size_standard_peaks_idxs = extract_ss_peaks(size_standard_dye_lane)
+        size_standard_peaks_idxs = extract_ss_peaks_new(size_standard_dye_lane)
         self.bps = bps = get_size_standard_bps(self.size_standard)
 
         diff = VAL_THRESHOLD + 1

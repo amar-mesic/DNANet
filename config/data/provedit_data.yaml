@@ -10,13 +10,14 @@ dataset:
     name: ProvedItFileCategorizer
   sample_validation_strategy:
     name: NFIValidationStrategy
+  with_scan_point_standardization: true
     
-# split:
-#   train: [39, 40, 41, 42, 43]
-#   val: 0.5
-#   test: 0.5
-
 split:
-  train: 0.8
-  val: 0.0
-  test: 0.2
+  train: [39, 40, 41, 42, 43]
+  val: 0.5
+  test: 0.5
+
+# split:
+#   train: 0.8
+#   val: 0.0
+#   test: 0.2

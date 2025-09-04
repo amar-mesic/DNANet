@@ -9,7 +9,7 @@ from DNAnet.data.data_models import Annotation, Panel
 from DNAnet.data.data_models.base import Image
 from DNAnet.data.data_models.hid_image import HIDImage
 from DNAnet.data.kit_compatibility.lane_standards import BASE_PAIR_END, BASE_PAIR_START, RESCALE_SIZE, VAL_THRESHOLD, InternalSizeStandard, get_size_standard_bps
-from DNAnet.data.utils import basepair_interpolator, extract_ss_peaks, find_peak_boundary, find_peak_idx_near_or_in_range, rescale_dye
+from DNAnet.data.utils import basepair_interpolator, extract_ss_peaks_new, find_peak_boundary, find_peak_idx_near_or_in_range, rescale_dye
 from DNAnet.utils import load_donor_alleles_synthetic_data
 from DNAnet.typing import PathLike
 
@@ -67,7 +67,7 @@ class SyntheticImage(Image):
         
 
         size_standard_dye_lane = np.array(profile[-1])
-        size_standard_peaks_idxs = extract_ss_peaks(size_standard_dye_lane)
+        size_standard_peaks_idxs = extract_ss_peaks_new(size_standard_dye_lane)
         self.bps = bps = get_size_standard_bps(self.size_standard)
 
         diff = VAL_THRESHOLD + 1

@@ -4,6 +4,7 @@ from typing import List, Optional, Set, Tuple
 from DNAnet.data.data_models.base import InMemoryDataset, SimpleDataset
 from DNAnet.data.data_models.dna_models import Panel
 from DNAnet.data.data_models.hid_image import HIDImage
+from DNAnet.data.data_models.hid_image_old import HIDImageOld
 from DNAnet.data.kit_compatibility.lane_standards import InternalSizeStandard
 from DNAnet.data.parsing.file_categorization_strategy import FileCategorizationStrategy, categorize_files
 from DNAnet.data.parsing.file_parsing import find_files_by_suffix
@@ -23,7 +24,8 @@ class CustomHIDDataset(InMemoryDataset):
                  adjustment_of_annotations: Optional[str] = None,
                  size_standard: str = InternalSizeStandard.WEN_ILS.value,
                  file_categorization_strategy: FileCategorizationStrategy = lambda file_name: "sample",
-                 sample_validation_strategy: SampleValidationStrategy = lambda image: True
+                 sample_validation_strategy: SampleValidationStrategy = lambda image: True,
+                 with_scan_point_standardization: bool = True,
                 ):
         super().__init__(shuffle)
 
@@ -45,7 +47,7 @@ class CustomHIDDataset(InMemoryDataset):
 
         LOGGER.info(f"Found {len(self.sample_files)} files in {self.root_path}")
         unvalidated_images = [
-            HIDImage(path=f, panel=self.panel, size_standard=self.size_standard)
+            HIDImage(path=f, panel=self.panel, size_standard=self.size_standard) if with_scan_point_standardization else HIDImageOld(path=f, panel=self.panel, size_standard=self.size_standard)
             for f in self.sample_files
         ]
 

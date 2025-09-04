@@ -194,3 +194,4 @@ resources/data/synthetic/
 
 .neptune/
 
+/checkpoints

@@ -248,6 +248,26 @@ def find_peak_idx_near_or_in_range(array: np.ndarray, index_range: np.ndarray,
 
 
 def extract_ss_peaks(array: np.ndarray) -> np.ndarray:
+    """ 
+    Takes an array and extracts the indices of the size standard peaks, by comparing each
+    value with the neighbours and a threshold. We may find 'flat' peaks (e.g.
+    [500, 520, 520, 510]) or a peak within a close distance of another
+    peak, therefore we filter the found indices based on distance.
+    """
+    peak_idxs = find_peaks_above_threshold(array, 180)
+    # the final two peaks in the size standard are often lower than the other peaks, therefore we
+    # try to find those in the end of the array with a lower threshold if we haven't found them yet
+    split_idx = 8200  # TODO: can we find this dynamically or something?
+    if len(peak_idxs) > 0 and peak_idxs[-1] <= split_idx:
+        final_peak_idxs = find_peaks_above_threshold(array[split_idx:], 120) + split_idx
+        peak_idxs = np.union1d(peak_idxs, final_peak_idxs)
+    # look for peak that are close (within 15 pixels) and delete the peak on the first index. This
+    # may go wrong when we have a situation like [1000, 1001, 800, 800, 799], then we
+    # ideally want to keep the highest peak (1001), but now this one gets deleted and we keep 1000.
+    close_idxs = np.where(np.diff(peak_idxs) <= 15)[0]
+    return np.delete(peak_idxs, close_idxs)
+
+def extract_ss_peaks_new(array: np.ndarray) -> np.ndarray:
     """
     Takes an array and extracts the indices of the size standard peaks, by comparing each
     value with the neighbours and a threshold. We may find 'flat' peaks (e.g.
