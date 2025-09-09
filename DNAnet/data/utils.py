@@ -1,3 +1,4 @@
+import re
 from typing import Optional, Tuple
 import logging
 
@@ -139,30 +140,31 @@ def validate_ss_peaks(
                     scipy.ndimage.shift(expected_bps, shift=1, mode='nearest')
                     ), axis=0))[0, 1:]
     
-    relative_distances = distances_between_peaks / distance_basepairs
+    relative_distances = (distances_between_peaks / distance_basepairs)[3:]
 
     passes_validation = bool(np.all((relative_distances <= max_pixels_per_bp) & (relative_distances >= min_pixels_per_bp)))
-    if passes_validation:
-        return True
-    # LOGGER.warning("Size standard peaks validation failed. Trying validation only scan points after 4000")
+    return passes_validation
+    # if passes_validation:
+    #     return True
+    # # LOGGER.warning("Size standard peaks validation failed. Trying validation only scan points after 4000")
     
-    # Temporary fix: only look at last 20 peaks
-    # since first few peaks are often not ILS peaks, but primer flares.
-    # TODO: Detect if peaks are primer flares and remove them. This would be in previous step.
-    passes_validation = passes_validation or bool(np.all((relative_distances[-20:] <= max_pixels_per_bp) & (relative_distances[-20:] >= min_pixels_per_bp)))
+    # # Temporary fix: only look at last 20 peaks
+    # # since first few peaks are often not ILS peaks, but primer flares.
+    # # TODO: Detect if peaks are primer flares and remove them. This would be in previous step.
+    # passes_validation = passes_validation or bool(np.all((relative_distances[-20:] <= max_pixels_per_bp) & (relative_distances[-20:] >= min_pixels_per_bp)))
     
-    # Adjustable, but we can expect in most EPGs that the first 4000 scan points do not contain any alleles.
-    threshold = 3700
-    peaks_filtered = peaks[peaks >= threshold]
-    distances_between_peaks_filtered = np.abs(
-        np.diff((peaks_filtered,
-                    scipy.ndimage.shift(peaks_filtered, shift=1, mode='nearest')
-                    ), axis=0))[0, 1:]
+    # # Adjustable, but we can expect in most EPGs that the first 4000 scan points do not contain any alleles.
+    # threshold = 3700
+    # peaks_filtered = peaks[peaks >= threshold]
+    # distances_between_peaks_filtered = np.abs(
+    #     np.diff((peaks_filtered,
+    #                 scipy.ndimage.shift(peaks_filtered, shift=1, mode='nearest')
+    #                 ), axis=0))[0, 1:]
 
 
-    relative_distances_filtered = relative_distances[-distances_between_peaks_filtered.shape[0]:]
+    # relative_distances_filtered = relative_distances[-distances_between_peaks_filtered.shape[0]:]
 
-    return passes_validation or bool(np.all((relative_distances_filtered <= max_pixels_per_bp) & (relative_distances_filtered >= min_pixels_per_bp)))
+    # return passes_validation or bool(np.all((relative_distances_filtered <= max_pixels_per_bp) & (relative_distances_filtered >= min_pixels_per_bp)))
 
 
 
@@ -310,7 +312,7 @@ def basepair_interpolator(indices: np.ndarray,
 
 
 
-def rescale_dye(
+def rescale_dye_new(
     basepairs: np.ndarray,
     rescale_size: int,
     target_range: Tuple[int, int]
@@ -323,6 +325,53 @@ def rescale_dye(
     ``None``).
     """
     bp_start, bp_end = target_range
+    target_linspace = np.linspace(bp_start, bp_end, rescale_size)
+
+    # Presorting interpolated base pairs
+    sort_indices = np.argsort(basepairs)
+    sorted_basepairs = basepairs[sort_indices]
+
+    # Find insertion indices
+    insertion_indices = np.searchsorted(
+        sorted_basepairs,
+        target_linspace,
+        side='left'
+    )
+
+    # Adjust indices for boundary conditions
+    insertion_indices = np.clip(
+        insertion_indices,
+        1,
+        len(sorted_basepairs) - 1
+    )
+
+    # Determine the closest index prior or after based on value proximity
+    left_indices = insertion_indices - 1
+    right_indices = insertion_indices
+
+    left_deltas = np.abs(sorted_basepairs[left_indices] - target_linspace)
+    right_deltas = np.abs(sorted_basepairs[right_indices] - target_linspace)
+
+    return np.where(
+        (left_deltas < right_deltas) | (left_deltas == right_deltas),
+        sort_indices[left_indices],
+        sort_indices[right_indices],
+    )
+
+
+
+
+def rescale_dye(basepairs: np.ndarray, size_standard: str, rescale_size: int = 4096) -> np.ndarray:
+    """
+    Rescale the interpolated base pairs of the size standard so that they fit between
+    BASE_PAIR_START and BASE_PAIR_END, on exactly RESCALE_SIZE pixels. The output array
+    should function as a translator that indicates which pixel indices (of an unscaled dye) should
+    be on every pixel location.
+    E.g. if the output is np.array([3825, 3826, ..]), then a pixel on index 3825 should be
+    scaled to the first pixel, and a pixel on index 3826 should be scaled to the second pixel.
+    """
+    bps = get_size_standard_bps(size_standard)
+    bp_start, bp_end = bps[0], bps[-1]
     target_linspace = np.linspace(bp_start, bp_end, rescale_size)
 
     # Presorting interpolated base pairs

@@ -19,7 +19,7 @@ from DNAnet.data.utils import (
     extract_ss_peaks_new,
     find_peak_boundary,
     find_peak_idx_near_or_in_range,
-    rescale_dye,
+    rescale_dye_new,
 )
 from DNAnet.typing import PathLike
 from DNAnet.utils import load_donor_alleles_provedit, load_donor_alleles
@@ -143,7 +143,7 @@ class HIDImage(Image):
                                    original_x_values=bps, extrapolate=False)
         self.interpolated_base_pairs = interpolator(np.arange(len(size_standard_dye_lane)))
 
-        rescaled_indices = rescale_dye(
+        rescaled_indices = rescale_dye_new(
             self.interpolated_base_pairs,
             rescale_size=RESCALE_SIZE,
             target_range=(BASE_PAIR_START, BASE_PAIR_END),
