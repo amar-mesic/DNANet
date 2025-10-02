@@ -53,6 +53,7 @@ def run(data_config: str,
 
     LOGGER.info("Loading dataset...")
     dataset = load_dataset(data_config)
+    LOGGER.info(f"Loaded dataset with {len(dataset)} samples")
     if split:
         LOGGER.info(f"Splitting dataset, using {split * 100}% for training")
         dataset, _ = dataset.split(split, seed=seed)

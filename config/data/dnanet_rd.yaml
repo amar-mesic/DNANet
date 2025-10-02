@@ -12,4 +12,5 @@ dataset:
   skip_if_invalid_ladder: false
   analysis_threshold_type: DTL  # DTH (high) or DTL (low)
   ground_truth_as_annotations: false  # whether to store ground truth in meta['called_alleles']
+  group_genotypes_in_split: true  # whether to keep genotypes together when splitting
   group_replicas_in_split: true

@@ -67,6 +67,7 @@ class HIDDataset(InMemoryDataset):
                  skip_if_invalid_ladder: Optional[bool] = False,
                  analysis_threshold_type: Optional[str] = 'DTL',
                  ground_truth_as_annotations: Optional[bool] = False,
+                 group_genotypes_in_split: Optional[bool] = False,
                  group_replicas_in_split: Optional[bool] = True):
         super().__init__(shuffle)
         self.root = str(root)
@@ -76,6 +77,7 @@ class HIDDataset(InMemoryDataset):
         self.skip_if_invalid_ladder = skip_if_invalid_ladder
         self.adjustment_of_annotations = adjustment_of_annotations
         self.ground_truth_as_annotations = ground_truth_as_annotations
+        self.group_genotypes_in_split = group_genotypes_in_split
         self.group_replicas_in_split = group_replicas_in_split
 
         # If cache path is given and use_cache is set to true, load cached data.
@@ -359,6 +361,13 @@ class HIDDataset(InMemoryDataset):
 
     def split(self, fraction: float, seed: Optional[float] = None) \
             -> Tuple['SimpleDataset', 'SimpleDataset']:
+        
+        if self.group_genotypes_in_split:
+            LOGGER.info("Splitting HIDDataset, taking into account splitting by genotypes and "
+                        "balancing number of donors")
+            return self._split_by_genotypes(int(fraction))
+
+
         if not 0 < fraction < 1:
             raise ValueError(f"Fraction should be between 0 and 1, got {fraction}.")
 
@@ -368,6 +377,24 @@ class HIDDataset(InMemoryDataset):
             return self._split_by_replicas_and_noc(fraction, seed)
         else:
             return super(HIDDataset, self).split(fraction, seed)
+        
+    def _split_by_genotypes(self, batch_to_take) \
+            -> Tuple['SimpleDataset', 'SimpleDataset']:
+        """
+        Split the dataset by ensuring that genotypes are put in the same set and the number of
+        donors are balanced in the two sets.
+        """
+        batch_to_images_mapping = self._get_hids_per_prefix_per_batch()
+
+        hids_test = batch_to_images_mapping[batch_to_take]
+        hids_train = list(chain.from_iterable(
+            [v for k, v in batch_to_images_mapping.items() if k != batch_to_take]
+        ))
+        return SimpleDataset(data=hids_train, shuffle=self.shuffle), \
+               SimpleDataset(data=hids_test, shuffle=self.shuffle)
+
+        
+        
 
     def _split_by_replicas_and_noc(self, fraction: float, seed: Optional[float] = None) \
             -> Tuple['SimpleDataset', 'SimpleDataset']:
@@ -440,6 +467,19 @@ class HIDDataset(InMemoryDataset):
             prefix = get_prefix_from_filename(im.path.stem)
             noc = prefix[-1]
             hids_per_prefix_per_nr_donors[noc][prefix].append(im)
+        return hids_per_prefix_per_nr_donors
+    
+    def _get_hids_per_prefix_per_batch(self) -> Dict[int, List[HIDImage]]:
+        """
+        Get per number of contributors and per prefix (i.e. `1A2`) the belonging HIDImages as
+        a dictionary. The number of contributors is the second number in the prefix, e.g. '2' in
+        `1A2`.
+        """
+        hids_per_prefix_per_nr_donors = defaultdict(list)
+        for im in self._data:
+            prefix = get_prefix_from_filename(im.path.stem)
+            batch = int(prefix[0])
+            hids_per_prefix_per_nr_donors[batch].append(im)
         return hids_per_prefix_per_nr_donors
 
     def get_hid_image_by_name(self, hid_file_name: PathLike) -> Optional[HIDImage]:
