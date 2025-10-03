@@ -59,6 +59,8 @@ def run(data_config: str,
             f.write(results)
         LOGGER.info(f"Results: \n {results}")
         LOGGER.info(f"Results written to {metrics_path}")
+        # log the predictions as well
+        LOGGER.info(f"Predictions: \n {predictions}")
 
     if save_preds:
         LOGGER.info("Saving predictions to JSON...")

@@ -7,7 +7,7 @@ training:
   log_neptune: true
   min_delta: 0.0
   min_lr: 1.0e-05
-  num_epochs: 1
+  num_epochs: 50
   patience: 20
   pct_start: 0.3
   save_best: false # needs valiation set, how do I give?
