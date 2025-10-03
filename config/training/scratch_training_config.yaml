@@ -1,0 +1,23 @@
+training:
+  batch_size: 128
+  checkpoint_dir: checkpoints/
+  experiment_name: "670+\u957F-1\u6B63\u771F:0\u6B63\u5047-\u8003\u8BD5\u500D0-\u9884\
+    \uFF1A\u8BAD\u7EC3,\u7F29\u653E-\u79CD0"
+  learning_rate: 0.0005
+  log_neptune: true
+  min_delta: 0.0
+  min_lr: 1.0e-05
+  num_epochs: 150
+  patience: 20
+  pct_start: 0.3
+  save_best: false # needs valiation set, how do I give?
+  scheduler_gamma: 0.8
+  scheduler_type: OneCycleLR
+  seed: 0
+  steps_per_epoch: null
+  synth_ratio: 0
+  tensorboard: false
+  use_evaluation_metric: true
+  use_scheduler: false
+  weight_decay: 0.0001
+  
