@@ -41,7 +41,7 @@ def run(data_config: str,
         LOGGER.info(f"Splitting dataset, using {split * 100}% for evaluation")
         # use 1-split and a seed to ensure the same splitting is done as during training,
         # but we now take the 'second' dataset for evaluation
-        _, dataset = dataset.split(1 - split, seed=seed)
+        dataset, _ = dataset.split_by_genotypes(split, seed=seed)
 
     LOGGER.info("Applying model...")
     predictions = model.predict_batch(dataset)
